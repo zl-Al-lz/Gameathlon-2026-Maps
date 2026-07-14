@@ -5,4 +5,5 @@ For Gameathlon 2026, I was responsible for implementing map balance improvements
 The repository also includes the exclusive maps I developed for the previous Pandora's Box 2 release.
 
 https://www.ageofempires.com/events/gameathlon-athens-aom/
+
 https://liquipedia.net/ageofempires/Gameathlon/2026
