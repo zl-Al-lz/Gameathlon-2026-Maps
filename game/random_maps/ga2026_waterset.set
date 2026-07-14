@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<randomMaps 
+  displayName="Gameathlon 2026 Water Maps" 
+  imagepath="resources\maps\map_picker\GA2026WaterMaps.png" 
+  helpText="Randomly selects from among all Gameathlon 2026 water maps. 
+  &#10;
+  &#10;
+  Maps available in the set:
+  &#10; 
+  Budapest (Recalibrated)
+   &#10; 
+  Midgard (Recalibrated)
+   &#10; 
+  Mirage (Recalibrated)
+  " 
+  cannotReplace=""
+  watermap="">
+  
+  <map>budapest_recalibrated_ga_2026_1_3</map>
+  <map>midgard_recalibrated_ga_2026_1_3</map>
+  <map>mirage_recalibrated_ga_2026_1_3</map>
+
+</randomMaps>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<randomMaps 
+  displayName="Gameathlon 2026 Maps" 
+  imagepath="resources\maps\map_picker\GA2026AllMaps.png" 
+  helpText="Randomly selects from among all Gameathlon 2026 maps. 
+  &#10;
+  &#10;
+  Maps available in the set:
+  &#10; 
+  Blue Lagoon (Recalibrated)
+  &#10; 
+  Budapest (Recalibrated)
+   &#10; 
+  Cloud Forest (Obsidian Mirror)
+   &#10; 
+  Elysium (Recalibrated)
+   &#10; 
+  Ghost Lake (Recalibrated)
+   &#10; 
+  Giza (Recalibrated)
+   &#10; 
+  Gorge (Recalibrated)
+   &#10; 
+  Midgard (Reimagined)
+   &#10; 
+  Mirage (Reimagined)
+   &#10; 
+  Mount Olympus (Reimagined)
+   &#10; 
+  Steppe (Immortal Pillars)
+  " 
+  cannotReplace=""
+  landmap="">
+
+  <map>budapest_recalibrated_ga_2026_1_3</map>
+  <map>blue_lagoon_recalibrated_ga_2026_1_3</map>
+  <map>cloud_forest</map>
+  <map>elysium_recalibrated_ga_2026_1_3</map>
+  <map>ghost_lake_recalibrated_ga_2026_1_3</map>
+  <map>giza_recalibrated_ga_2026_1_3</map>
+  <map>gorge_recalibrated_ga_2026_1_3</map>
+  <map>steppe</map>
+  <map>midgard_recalibrated_ga_2026_1_3</map>
+  <map>mirage_recalibrated_ga_2026_1_3</map>
+  <map>mount_olympus_reimagined_ga_2026_1_3</map>
+
+</randomMaps>
