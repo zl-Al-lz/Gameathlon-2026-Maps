@@ -1,5 +1,11 @@
 include "lib2/rm_core.xs";
 
+/*
+** Ghost Lake | Recalibrated | 
+** Treatment for Gameathlon by AL
+** Date: June 14, 2026
+*/
+
 void generate()
 {
    rmSetProgress(0.0);
@@ -25,6 +31,10 @@ void generate()
 
    rmSetProgress(0.1);
 
+   // Biome assets.
+   int mapCliffType = cCliffNorseSnow;
+   int mapForestType = cForestNorsePineSnow;
+
    // Player placement.
    rmSetTeamSpacingModifier(xsRandFloat(0.7, 0.8));
    rmPlacePlayersOnCircle(xsRandFloat(0.35, 0.375));
@@ -44,71 +54,243 @@ void generate()
    // Default tree type.
    rmSetDefaultTreeType(cUnitTypeTreePineSnow);
 
+   // Gameathlon stuff.
+   bool isTournamentSeason = true; 
+
+   // Ensure that settlements, gold mines, hunts and areas share the same side.
+   int sharedSide = xsRandBool(0.5) ? cLocSideSame : cLocSideOpposite;
+
    // Global elevation.
-   rmAddGlobalHeightNoise(cNoiseFractalSum, 4.0, 0.1, 5, 0.3);
+   rmAddGlobalHeightNoise(cNoiseFractalSum, 4.0, 0.05, 2, 0.5);
+
+   // Override the SimLocs variation with a significantly higher value to introduce
+   // much more variety without compromising the competitive treatment.
+   vSimLocDefaultRadiusVar *= 1.35; // ± 7.5m → 10.1m.
+   vSimLocDefaultAngleVar *= 1.7; // ± 11,25° → 19,1°.
+
+   // We will use areas instead of createPlayerLocDistanceConstraint to avoid abrupt and unnatural cuts.
+   int playerAreaClassID = rmClassCreate("player area class");
+
+   float playerAreaSize = rmRadiusToAreaFraction(42.0);
+
+   for(int i = 1; i <= cNumberPlayers ; i++)
+   {
+      int playerID = vDefaultTeamPlayerOrder[i];
+
+      int playerAreaID = rmAreaCreate("player area " + playerID);
+      rmAreaSetLocPlayer(playerAreaID, playerID, 0);
+      rmAreaSetSize(playerAreaID, playerAreaSize);
+      rmAreaSetCoherence(playerAreaID, 0.4);
+      rmAreaAddToClass(playerAreaID, playerAreaClassID);
+   }
+   
+   // Build all player areas simultaneously.
+   rmAreaBuildAll();
+   
+   // Do not place the lake yet.
 
    rmSetProgress(0.2);
 
-   // Ghost lake.
-   int lakeAreaID = rmAreaCreate("lake");
-   rmAreaAddTerrainLayer(lakeAreaID, cTerrainNorseSnowRocks1, 0, 1);
-   rmAreaAddTerrainLayer(lakeAreaID, cTerrainNorseShore1, 1, 2);
-   rmAreaAddTerrainLayer(lakeAreaID, cTerrainDefaultIce1, 3, 4);
-   rmAreaSetMix(lakeAreaID, iceMixID);
-   rmAreaSetLoc(lakeAreaID, cCenterLoc);
-   rmAreaSetSize(lakeAreaID, 0.175);
-
-   rmAreaSetHeight(lakeAreaID, 0.0);
-   // Incremental smoothing so we get a nice transition.
-   rmAreaAddHeightBlend(lakeAreaID, cBlendEdge, cFilter5x5Gaussian, 10, 10, true, true);
-   rmAreaSetBlobs(lakeAreaID, 8, 10);
-   rmAreaSetBlobDistance(lakeAreaID, rmGetMapXTiles() / 12.0, rmGetMapZTiles() / 6.0);
-   rmAreaSetEdgeSmoothDistance(lakeAreaID, 5);
-
-   rmAreaAddConstraint(lakeAreaID, createPlayerLocDistanceConstraint(40.0));
-   rmAreaAddConstraint(lakeAreaID, createSymmetricBoxConstraint(rmXMetersToFraction(50.0)));
-
-   rmAreaBuild(lakeAreaID);
-
-   // Set up constraints.
-   int avoidCenter4 = rmCreateAreaDistanceConstraint(lakeAreaID, 4.0);
-   int avoidCenter8 = rmCreateAreaDistanceConstraint(lakeAreaID, 8.0);
-   int avoidCenter12 = rmCreateAreaDistanceConstraint(lakeAreaID, 12.0);
-   int avoidCenter16 = rmCreateAreaDistanceConstraint(lakeAreaID, 16.0);
-
-   rmSetProgress(0.3);
-
-   // Settlements and towers.
+   // Settlements.
    placeStartingTownCenters();
 
    // Starting towers.
-   // The center avoids player cores sufficiently to not make towers avoid the center.
    int startingTowerID = rmObjectDefCreate("starting tower");
    rmObjectDefAddItem(startingTowerID, cUnitTypeSentryTower, 1);
    addObjectLocsPerPlayer(startingTowerID, true, 4, cStartingTowerMinDist, cStartingTowerMaxDist, cStartingTowerAvoidanceMeters);
+
    generateLocs("starting tower locs");
 
+   // Prioritize starting objects placement, even above the lake.
+
+   // Starting objects.
+
+   // Starting gold.
+   int startingGoldID = rmObjectDefCreate("starting gold");
+   rmObjectDefAddItem(startingGoldID, cUnitTypeMineGoldMedium, 1);
+   rmObjectDefAddConstraint(startingGoldID, vDefaultAvoidEdge);
+   rmObjectDefAddConstraint(startingGoldID, vDefaultGoldAvoidImpassableLand);
+   rmObjectDefAddConstraint(startingGoldID, vDefaultStartingGoldAvoidTower);
+   rmObjectDefAddConstraint(startingGoldID, vDefaultForceStartingGoldNearTower);
+   addObjectLocsPerPlayer(startingGoldID, false, xsRandInt(1, 2), cStartingGoldMinDist, cStartingGoldMaxDist, cStartingGoldAvoidanceMeters);
+   
+   generateLocs("starting gold locs");
+
+   // Starting hunt.
+   int startingHuntID = rmObjectDefCreate("starting hunt");
+   if(xsRandBool(0.5) == true)
+   {
+      rmObjectDefAddItem(startingHuntID, cUnitTypeBoar, 4);
+   }
+   else
+   {
+      rmObjectDefAddItem(startingHuntID, cUnitTypeAurochs, xsRandInt(3, 4));
+   }
+   rmObjectDefAddConstraint(startingHuntID, vDefaultAvoidEdge);
+   rmObjectDefAddConstraint(startingHuntID, vDefaultFoodAvoidAll);
+   rmObjectDefAddConstraint(startingHuntID, vDefaultFoodAvoidImpassableLand);
+   rmObjectDefAddConstraint(startingHuntID, vDefaultForceInTowerLOS);
+   addObjectLocsPerPlayer(startingHuntID, false, 1, cStartingHuntMinDist, cStartingHuntMaxDist, cStartingObjectAvoidanceMeters);
+
+   // Berries.
+   int startingBerriesID = rmObjectDefCreate("starting berries");
+   rmObjectDefAddItem(startingBerriesID, cUnitTypeBerryBush, xsRandInt(4, 6), cBerryClusterRadius);
+   rmObjectDefAddConstraint(startingBerriesID, vDefaultAvoidEdge);
+   rmObjectDefAddConstraint(startingBerriesID, vDefaultBerriesAvoidAll);
+   rmObjectDefAddConstraint(startingBerriesID, vDefaultBerriesAvoidImpassableLand);
+   addObjectLocsPerPlayer(startingBerriesID, false, 1, cStartingBerriesMinDist, cStartingBerriesMaxDist, cStartingObjectAvoidanceMeters);
+
+   // Chicken.
+   int numChicken = xsRandInt(4, 6);
+
+   int startingChickenID = rmObjectDefCreate("starting chicken");
+   // Set chicken variation, excluding whites, as they are hard to see on snow maps.
+   for (int i = 0; i < numChicken; i++)
+   {
+      rmObjectDefAddItem(startingChickenID, cUnitTypeChicken, 1);
+      rmObjectDefSetItemVariation(startingChickenID, i, xsRandInt(cChickenVariationBrown, cChickenVariationBlack));
+   }
+   rmObjectDefAddConstraint(startingChickenID, vDefaultAvoidEdge);
+   rmObjectDefAddConstraint(startingChickenID, vDefaultFoodAvoidAll);
+   rmObjectDefAddConstraint(startingChickenID, vDefaultFoodAvoidImpassableLand);
+   addObjectLocsPerPlayer(startingChickenID, false, 1, cStartingChickenMinDist, cStartingChickenMaxDist, cStartingObjectAvoidanceMeters);
+
+   // Herdables.
+   int startingHerdID = rmObjectDefCreate("starting herd");
+   rmObjectDefAddItem(startingHerdID, cUnitTypeGoat, xsRandInt(2, 5));
+   rmObjectDefAddConstraint(startingHerdID, vDefaultAvoidEdge);
+   rmObjectDefAddConstraint(startingHerdID, vDefaultHerdAvoidAll);
+   rmObjectDefAddConstraint(startingHerdID, vDefaultHerdAvoidImpassableLand);
+   addObjectLocsPerPlayer(startingHerdID, true, 1, cStartingHerdMinDist, cStartingHerdMaxDist);
+
+   generateLocs("starting food locs");
+
+   // Forests.
+   float avoidForestMeters = 25.0;
+
+   int forestClassID = rmClassCreate("forest class");
+
+   int forestDefID = rmAreaDefCreate("forest");
+   rmAreaDefSetSizeRange(forestDefID, rmTilesToAreaFraction(80), rmTilesToAreaFraction(100));
+   rmAreaDefSetForestType(forestDefID, mapForestType);
+   rmAreaDefSetAvoidSelfDistance(forestDefID, avoidForestMeters);
+   rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidAll);
+   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidImpassableLand10);
+   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidSettlementWithFarm);
+   rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidTownCenter);
+   rmAreaDefAddOriginConstraint(forestDefID, vDefaultAvoidEdge, 1.0);
+   rmAreaDefAddToClass(forestDefID, forestClassID);
+
+   // Starting forests.
+   addAreaLocsPerPlayer(forestDefID, 3, cStartingForestMinDist - 2.5, cStartingForestMaxDist - 2.5, avoidForestMeters * 1.55);
+
+   generateLocs("starting forest locs");
+
+   rmSetProgress(0.3);
+
+   // Ghost lake stuff.
+   float lakeFraction = xsRandFloat(0.18, 0.185);
+   vector lakeLoc = vectorXZ(xsRandFloat(0.49, 0.51), xsRandFloat(0.49, 0.51));
+
+   int lakeAvoidPlayerArea = rmCreateClassDistanceConstraint(playerAreaClassID, xsRandFloat(1.0, 4.0), cClassAreaDistance, 
+                                                            "lake vs player area");
+   int lakeAvoidForest = rmCreateClassDistanceConstraint(forestClassID, 6.0, cClassAreaDistance, "lake vs forest");
+
+   // Fake lake (It will serve as an expansion limit).
+   int fakeLakeID = rmAreaCreate("fake lake");
+   rmAreaSetLoc(fakeLakeID, lakeLoc);
+   rmAreaSetSize(fakeLakeID, lakeFraction);
+   rmAreaSetEdgeSmoothDistance(fakeLakeID, 5);
+   rmAreaSetBlobs(fakeLakeID, 8, 10);
+   rmAreaSetBlobDistance(fakeLakeID, rmGetMapXTiles() / 12.0, rmGetMapZTiles() / 6.0);
+   rmAreaAddConstraint(fakeLakeID, lakeAvoidPlayerArea);
+   rmAreaAddConstraint(fakeLakeID, lakeAvoidForest);
+   rmAreaAddConstraint(fakeLakeID, createSymmetricBoxConstraint(rmXMetersToFraction(50.0)));
+   rmAreaBuild(fakeLakeID);
+
+   // Generate semi-symmetrical blobs using a simple trick. LocGen will place their origins along the edges of a fake lake,
+   // then the real lake will be generated and expanded while avoiding those blobs.
+   int blobsClassID = rmClassCreate("blob class");
+
+   float avoidBlobsMeters = 55.0;
+
+   int lakeBlobDefID = rmAreaDefCreate("lake blob");
+   rmAreaDefSetSizeRange(lakeBlobDefID, rmTilesToAreaFraction(200), rmTilesToAreaFraction(250));
+   rmAreaDefSetAvoidSelfDistance(lakeBlobDefID, avoidBlobsMeters);
+   rmAreaDefSetEdgeSmoothDistance(lakeBlobDefID, 5);
+   rmAreaDefAddOriginConstraint(lakeBlobDefID, rmCreateAreaEdgeConstraint(fakeLakeID));
+   rmAreaDefAddToClass(lakeBlobDefID, blobsClassID);
+   if(gameIs1v1())
+   {
+      // Generate the mirrored locs.
+      int[] blobLocsIDs = addMirroredLocsPerPlayerPair(1 * getMapAreaSizeFactor(), 60.0, -1.0, avoidBlobsMeters);
+
+      // Apply only angular variation. (No radius)
+      setLocsAngleVariance(blobLocsIDs, vSimLocDefaultAngleVar);
+
+      // Place the blobs.
+      setLocsArea(blobLocsIDs, lakeBlobDefID);
+
+      generateLocs("lake blob locs", false, true, false);
+   }
+   else
+   {  // If it's not 1v1, unchecked.
+      rmAreaDefCreateAndBuildAreas(lakeBlobDefID, xsRandInt(1, 2) * cNumberPlayers * getMapAreaSizeFactor());
+   }
+
+   // Ghost lake.
+   int lakeAvoidBlobs = rmCreateClassDistanceConstraint(blobsClassID, 1.0, cClassAreaDistance,"real lake vs blobs");
+   int forceNearFakeLake = rmCreateAreaMaxDistanceConstraint(fakeLakeID, xsRandFloat(3.0, 7.0));
+
+   int realGhostLakeID = rmAreaCreate("real ghost lake");
+   rmAreaSetMix(realGhostLakeID, iceMixID);
+   rmAreaAddTerrainLayer(realGhostLakeID, cTerrainNorseSnowRocks1, 0, 1);
+   rmAreaAddTerrainLayer(realGhostLakeID, cTerrainNorseShore1, 1, 2);
+   rmAreaAddTerrainLayer(realGhostLakeID, cTerrainDefaultIce1, 3, 4);
+   rmAreaSetLoc(realGhostLakeID, lakeLoc);
+   rmAreaSetSize(realGhostLakeID, 1.0);
+   rmAreaSetHeight(realGhostLakeID, 0.0);
+   rmAreaAddHeightBlend(realGhostLakeID, cBlendEdge, cFilter5x5Gaussian, 10, 10, true, true);
+   rmAreaSetEdgeSmoothDistance(realGhostLakeID, 5);
+   rmAreaAddConstraint(realGhostLakeID, lakeAvoidBlobs);
+   rmAreaAddConstraint(realGhostLakeID, lakeAvoidForest);
+   rmAreaAddConstraint(realGhostLakeID, lakeAvoidPlayerArea);
+   rmAreaAddConstraint(realGhostLakeID, forceNearFakeLake); // Slight expansion variation.
+   rmAreaBuild(realGhostLakeID);
+
+   int avoidCenter8 = rmCreateAreaDistanceConstraint(realGhostLakeID, 8.0);
+   int avoidCenter12 = rmCreateAreaDistanceConstraint(realGhostLakeID, 12.0);
+   int avoidCenter10 = rmCreateAreaDistanceConstraint(realGhostLakeID, 10.0);
+   int avoidCenter16 = rmCreateAreaDistanceConstraint(realGhostLakeID, 16.0);
+
+   rmSetProgress(0.4);
+
    // Settlements.
+   int settlementAvoidForests = rmCreateClassDistanceConstraint(forestClassID, 15.0, cClassAreaDistance, "settlement vs forests");
+
    int firstSettlementID = rmObjectDefCreate("first settlement");
    rmObjectDefAddItem(firstSettlementID, cUnitTypeSettlement, 1);
    rmObjectDefAddConstraint(firstSettlementID, vDefaultSettlementAvoidEdge);
    rmObjectDefAddConstraint(firstSettlementID, vDefaultAvoidTowerLOS);
-   rmObjectDefAddConstraint(firstSettlementID, vDefaultAvoidCorner40);
+   rmObjectDefAddConstraint(firstSettlementID, vDefaultAvoidCorner32);
    rmObjectDefAddConstraint(firstSettlementID, avoidCenter16);
+   rmObjectDefAddConstraint(firstSettlementID, settlementAvoidForests);
 
    int secondSettlementID = rmObjectDefCreate("second settlement");
    rmObjectDefAddItem(secondSettlementID, cUnitTypeSettlement, 1);
    rmObjectDefAddConstraint(secondSettlementID, vDefaultSettlementAvoidEdge);
    rmObjectDefAddConstraint(secondSettlementID, vDefaultAvoidTowerLOS);
-   rmObjectDefAddConstraint(secondSettlementID, vDefaultAvoidCorner40);
+   rmObjectDefAddConstraint(secondSettlementID, vDefaultAvoidCorner32);
    rmObjectDefAddConstraint(secondSettlementID, vDefaultAvoidKotH);
    rmObjectDefAddConstraint(secondSettlementID, avoidCenter16);
-
+   rmObjectDefAddConstraint(secondSettlementID, settlementAvoidForests);
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(firstSettlementID, false, 1, 60.0, 80.0, cSettlementDist1v1, cBiasBackward,
-                          cInAreaDefault, cLocSideOpposite);
-      addSimObjectLocsPerPlayerPair(secondSettlementID, false, 1, 80.0, 120.0, cSettlementDist1v1, cBiasAggressive);
+      addSimObjectLocsPerPlayerPair(firstSettlementID, false, 1, 60.0, 80.0, cSettlementDist1v1 * 1.15, cBiasBackward,
+                                    cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideOpposite);
+
+      addSimObjectLocsPerPlayerPair(secondSettlementID, false, 1, 80.0, 120.0, cSettlementDist1v1 * 1.15, cBiasAggressive, 
+                                    cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -129,121 +311,95 @@ void generate()
       addObjectLocsPerPlayer(bonusSettlementID, false, 1 * getMapAreaSizeFactor(), 90.0, -1.0, 100.0);
    }
 
-   generateLocs("settlement locs");
+   // Since these are not areas that affect the terrain as such where the settlements are located, 
+   // we can place them first without worry.
+   bool successfulSettlements = generateLocs("settlement locs", true, true, true, false);
 
-   rmSetProgress(0.4);
+   int settlementAreaClassID = rmClassCreate("settlement area class");
+   int avoidSettlementArea = rmCreateClassDistanceConstraint(settlementAreaClassID, 1.0, cClassAreaDistance, "cliff vs settlement areas");
+
+   if(successfulSettlements)
+   {
+      int numSettlementsLocs = rmLocGenGetNumberLocs();
+
+      float settlementAreaFraction = rmRadiusToAreaFraction(25.0);
+
+      for(int i = 0; i < numSettlementsLocs; i++)
+      {
+         int settlementAreaID = rmAreaCreate("settlement area " + i);
+         rmAreaSetLoc(settlementAreaID, rmLocGenGetLoc(i));
+         rmAreaSetSize(settlementAreaID, settlementAreaFraction);
+         rmAreaSetCoherence(settlementAreaID, 0.35);
+         rmAreaSetEdgeSmoothDistance(settlementAreaID, 2);
+         rmAreaSetEdgePerturbDistance(settlementAreaID, -1.5, 1.5, false);
+         rmAreaAddToClass(settlementAreaID, settlementAreaClassID);
+         rmAreaBuild(settlementAreaID);
+      }
+
+      resetLocGen();
+   }
 
    // Cliffs.
-   int cliffClassID = rmClassCreate();
-   int numCliffsPerPlayer = xsRandInt(1 * getMapAreaSizeFactor(), 2 * getMapAreaSizeFactor());
+   int cliffClassID = rmClassCreate("cliff class");
+   int avoidCliffRamps = rmCreateClassDistanceConstraint(cliffClassID, 15.0, cClassAreaCliffRampDistance, "anything vs cliff ramps");
 
    // Scale with map size.
    float cliffMinSize = rmTilesToAreaFraction(350 * getMapAreaSizeFactor());
    float cliffMaxSize = rmTilesToAreaFraction(400 * getMapAreaSizeFactor());
 
-   int cliffAvoidCliff = rmCreateClassDistanceConstraint(cliffClassID, 40.0);
-   int cliffAvoidBuildings = rmCreateTypeDistanceConstraint(cUnitTypeBuilding, 20.0);
+   // Definition.
+   float avoidCliffMeters = 45.0;
 
-   for(int i = 1; i <= cNumberPlayers; i++)
+   int cliffOriginAvoidEdge = createSymmetricBoxConstraint(rmXTilesToFraction(6), rmZTilesToFraction(6));
+   int cliffAvoidPlayerArea = rmCreateClassDistanceConstraint(playerAreaClassID, 1.0, cClassAreaDistance, "cliff vs player area");
+   int cliffAvoidForests = rmCreateClassDistanceConstraint(forestClassID, 5.0, cClassAreaDistance, "cliff vs forests");
+
+   int cliffID = rmAreaDefCreate("cliff");
+   rmAreaDefSetMix(cliffID, baseMixID);
+   rmAreaDefSetSizeRange(cliffID, cliffMinSize, cliffMaxSize);
+   rmAreaDefSetCliffType(cliffID, mapCliffType);
+   rmAreaDefSetCliffRamps(cliffID, 2, 0.25, 0.0, 1.0);
+   rmAreaDefSetCliffRampSteepness(cliffID, 2.0);
+   rmAreaDefSetCliffEmbellishmentDensity(cliffID, 0.25);
+   rmAreaDefSetAvoidSelfDistance(cliffID, avoidCliffMeters);
+   rmAreaDefSetHeightRelative(cliffID, 7.0);
+   rmAreaDefAddHeightBlend(cliffID, cBlendAll, cFilter5x5Gaussian);
+   rmAreaDefSetEdgeSmoothDistance(cliffID, 10);
+   rmAreaDefSetCoherence(cliffID, 0.25);
+   rmAreaDefAddConstraint(cliffID, avoidSettlementArea);
+   rmAreaDefAddConstraint(cliffID, avoidCenter10);
+   rmAreaDefAddConstraint(cliffID, vDefaultAvoidTowerLOS);
+   rmAreaDefAddConstraint(cliffID, cliffAvoidPlayerArea);
+   rmAreaDefAddConstraint(cliffID, cliffAvoidForests);
+   rmAreaDefAddOriginConstraint(cliffID, cliffOriginAvoidEdge);
+   rmAreaDefSetOriginConstraintBuffer(cliffID, 5.0);
+   rmAreaDefAddToClass(cliffID, cliffClassID);
+   if(gameIs1v1())
    {
-      int p = vDefaultTeamPlayerOrder[i];
-      int teamArea = vTeamAreaIDs[rmGetPlayerTeam(p)];
-
-      for(int j = 0; j < numCliffsPerPlayer; j++)
+      if(xsRandBool(0.5))
       {
-         int cliffID = rmAreaCreate("cliff " + p + " " + j);
-         rmAreaSetParent(cliffID, teamArea);
+         addSimAreaLocsPerPlayerPair(cliffID, 1, 65.0, 85.0, avoidCliffMeters * 1.25, cBiasNone, cInAreaDefault, cLocSideRandom);
 
-         rmAreaSetSize(cliffID, xsRandFloat(cliffMinSize, cliffMaxSize));
-         rmAreaSetTerrainType(cliffID, cTerrainNorseSnow1);
-         rmAreaSetCliffType(cliffID, cCliffNorseSnow);
-         rmAreaSetCliffRamps(cliffID, 2, 0.25, 0.0, 1.0);
-         rmAreaSetCliffRampSteepness(cliffID, 2.0);
-         rmAreaSetCliffEmbellishmentDensity(cliffID, 0.25);
-         
-         rmAreaSetHeightRelative(cliffID, 7.0);
-         rmAreaAddHeightBlend(cliffID, cBlendAll, cFilter5x5Gaussian);
-         rmAreaSetEdgeSmoothDistance(cliffID, 10);
-         rmAreaSetCoherence(cliffID, 0.25);
-
-         rmAreaAddConstraint(cliffID, cliffAvoidCliff);
-         rmAreaAddConstraint(cliffID, cliffAvoidBuildings);
-         rmAreaAddConstraint(cliffID, avoidCenter12);
-         rmAreaAddConstraint(cliffID, vDefaultAvoidTowerLOS);
-         rmAreaAddToClass(cliffID, cliffClassID);
-
-         rmAreaBuild(cliffID);
+         addSimAreaLocsPerPlayerPair(cliffID, 1, 95.0, (cMapSizeCurrent > cMapSizeStandard) ? -1.0 : 125.0, avoidCliffMeters * 1.25, 
+                                    cBiasNone, cInAreaDefault,  cLocSideOpposite);
       }
-   }
+      else
+      {
+         addSimAreaLocsPerPlayerPair(cliffID, 1, 75.0, 120.0, avoidCliffMeters);
+      }
+      if(cMapSizeCurrent > cMapSizeStandard)
+      {
+         addAreaLocsPerPlayer(cliffID, 1 * getMapSizeBonusFactor() - 1, 85.0, -1.0, avoidCliffMeters);
+      }  
 
-   rmSetProgress(0.5);
-
-   // Starting objects.
-   // Starting gold.
-   int startingGoldID = rmObjectDefCreate("starting gold");
-   rmObjectDefAddItem(startingGoldID, cUnitTypeMineGoldMedium, 1);
-   rmObjectDefAddConstraint(startingGoldID, vDefaultAvoidEdge);
-   rmObjectDefAddConstraint(startingGoldID, vDefaultGoldAvoidImpassableLand);
-   rmObjectDefAddConstraint(startingGoldID, vDefaultStartingGoldAvoidTower);
-   rmObjectDefAddConstraint(startingGoldID, vDefaultForceStartingGoldNearTower);
-   rmObjectDefAddConstraint(startingGoldID, avoidCenter8);
-   addObjectLocsPerPlayer(startingGoldID, false, xsRandInt(1, 2), cStartingGoldMinDist, cStartingGoldMaxDist, cStartingGoldAvoidanceMeters);
-
-   generateLocs("starting gold locs");
-
-   // Starting hunt.
-   int startingHuntID = rmObjectDefCreate("starting hunt");
-   if(xsRandBool(0.5) == true)
-   {
-      rmObjectDefAddItem(startingHuntID, cUnitTypeBoar, 4);
+      generateLocs("cliff locs");
    }
    else
    {
-      rmObjectDefAddItem(startingHuntID, cUnitTypeAurochs, xsRandInt(3, 4));
+      buildAreaDefInTeamAreas(cliffID, xsRandInt(1, 2) * getMapAreaSizeFactor());
    }
-   rmObjectDefAddConstraint(startingHuntID, vDefaultAvoidEdge);
-   rmObjectDefAddConstraint(startingHuntID, vDefaultFoodAvoidAll);
-   rmObjectDefAddConstraint(startingHuntID, vDefaultFoodAvoidImpassableLand);
-   rmObjectDefAddConstraint(startingHuntID, vDefaultForceInTowerLOS);
-   rmObjectDefAddConstraint(startingHuntID, avoidCenter8);
-   addObjectLocsPerPlayer(startingHuntID, false, 1, cStartingHuntMinDist, cStartingHuntMaxDist, cStartingObjectAvoidanceMeters);
 
-   // Berries.
-   int startingBerriesID = rmObjectDefCreate("starting berries");
-   rmObjectDefAddItem(startingBerriesID, cUnitTypeBerryBush, xsRandInt(4, 6), cBerryClusterRadius);
-   rmObjectDefAddConstraint(startingBerriesID, vDefaultAvoidEdge);
-   rmObjectDefAddConstraint(startingBerriesID, vDefaultBerriesAvoidAll);
-   rmObjectDefAddConstraint(startingBerriesID, vDefaultBerriesAvoidImpassableLand);
-   rmObjectDefAddConstraint(startingBerriesID, avoidCenter8);
-   addObjectLocsPerPlayer(startingBerriesID, false, 1, cStartingBerriesMinDist, cStartingBerriesMaxDist, cStartingObjectAvoidanceMeters);
-
-   // Chicken.
-   int startingChickenID = rmObjectDefCreate("starting chicken");
-   int numChicken = xsRandInt(4, 6);
-   // Set chicken variation, excluding whites, as they are hard to see on snow maps.
-   for (int i = 0; i < numChicken; i++)
-   {
-      rmObjectDefAddItem(startingChickenID, cUnitTypeChicken, 1);
-      rmObjectDefSetItemVariation(startingChickenID, i, xsRandInt(cChickenVariationBrown, cChickenVariationBlack));
-   }
-   rmObjectDefAddConstraint(startingChickenID, vDefaultAvoidEdge);
-   rmObjectDefAddConstraint(startingChickenID, vDefaultFoodAvoidAll);
-   rmObjectDefAddConstraint(startingChickenID, vDefaultFoodAvoidImpassableLand);
-   rmObjectDefAddConstraint(startingChickenID, avoidCenter8);
-   addObjectLocsPerPlayer(startingChickenID, false, 1, cStartingChickenMinDist, cStartingChickenMaxDist, cStartingObjectAvoidanceMeters);
-
-
-   // Herdables.
-   int startingHerdID = rmObjectDefCreate("starting herd");
-   rmObjectDefAddItem(startingHerdID, cUnitTypeGoat, xsRandInt(2, 5));
-   rmObjectDefAddConstraint(startingHerdID, vDefaultAvoidEdge);
-   rmObjectDefAddConstraint(startingHerdID, vDefaultHerdAvoidAll);
-   rmObjectDefAddConstraint(startingHerdID, vDefaultHerdAvoidImpassableLand);
-   addObjectLocsPerPlayer(startingHerdID, true, 1, cStartingHerdMinDist, cStartingHerdMaxDist);
-
-   generateLocs("starting food locs");
-   
-   rmSetProgress(0.6);
+   rmSetProgress(0.5);
 
    // Gold.
    float avoidGoldMeters = 50.0;
@@ -261,7 +417,8 @@ void generate()
    addObjectDefPlayerLocConstraint(bonusGoldID, 70.0);
    if(gameIs1v1()== true)
    {
-      addSimObjectLocsPerPlayerPair(bonusGoldID, false, xsRandInt(2, 4) * getMapAreaSizeFactor(), 70.0, -1.0, avoidGoldMeters);
+      addSimObjectLocsPerPlayerPair(bonusGoldID, false, xsRandInt(2, 4) * getMapAreaSizeFactor(), 70.0, -1.0, avoidGoldMeters, 
+                                    cBiasNone, cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -269,6 +426,8 @@ void generate()
    }
 
    generateLocs("gold locs");
+
+   rmSetProgress(0.6);
 
    // Hunt.
    float avoidHuntMeters = 50.0;
@@ -295,7 +454,8 @@ void generate()
    rmObjectDefAddConstraint(closeHuntID, createPlayerLocDistanceConstraint(55.0));
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(closeHuntID, false, 1, 60.0, 80.0, avoidHuntMeters);
+      addSimObjectLocsPerPlayerPair(closeHuntID, false, 1, 60.0, 80.0, avoidHuntMeters, cBiasNone, cInAreaDefault, 
+                                    isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -324,7 +484,8 @@ void generate()
    addObjectDefPlayerLocConstraint(farHuntID, 60.0);
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(farHuntID, false, numFarHuntSpawns, 70.0, 100.0, avoidHuntMeters);
+      addSimObjectLocsPerPlayerPair(farHuntID, false, numFarHuntSpawns, 70.0, 100.0, avoidHuntMeters, cBiasNone, cInAreaDefault, 
+                                    isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -359,8 +520,6 @@ void generate()
    }
 
    generateLocs("hunt locs");
-
-   rmSetProgress(0.7);
 
    // Berries.
    float avoidBerriesMeters = 50.0;
@@ -402,8 +561,8 @@ void generate()
    rmObjectDefAddConstraint(centerHerdID, vDefaultHerdAvoidAll);
    rmObjectDefAddConstraint(centerHerdID, vDefaultHerdAvoidImpassableLand);
    rmObjectDefAddConstraint(centerHerdID, vDefaultAvoidTowerLOS);
-   rmObjectDefAddConstraint(centerHerdID, rmCreateAreaConstraint(lakeAreaID));
-   rmObjectDefAddConstraint(centerHerdID, rmCreateAreaEdgeDistanceConstraint(lakeAreaID, 16.0));
+   rmObjectDefAddConstraint(centerHerdID, rmCreateAreaConstraint(realGhostLakeID));
+   rmObjectDefAddConstraint(centerHerdID, rmCreateAreaEdgeDistanceConstraint(realGhostLakeID, 16.0));
    addObjectDefPlayerLocConstraint(centerHerdID, 60.0);
    addObjectLocsPerPlayer(centerHerdID, false, 1 * getMapSizeBonusFactor(), 60.0, -1.0, avoidHerdMeters);
 
@@ -431,49 +590,120 @@ void generate()
 
    generateLocs("predator locs");
 
+   rmSetProgress(0.7);
+
+   // Statue Definition.
+   int statueDefID = rmObjectDefCreate("statue def");
+   rmObjectDefAddItem(statueDefID, cUnitTypeStatueMajorGod, 1);
+
+   // Relic Definition.
+   int relicDefID = rmObjectDefCreate("relic def");
+   rmObjectDefAddItem(relicDefID, cUnitTypeRelic, 1);
+
+   // Torch Definition.
+   int torchDefID = rmObjectDefCreate("torch def");
+   rmObjectDefAddItem(torchDefID, cUnitTypeTorch, 1);
+
+   // Column Definition.
+   int columnDefID = rmObjectDefCreate("column def");
+   rmObjectDefAddItem(columnDefID, cUnitTypeColumns, 1);
+
+   // Relic area definition.
+   int relicAreaDefID = rmAreaDefCreate("relic area");
+   rmAreaDefSetTerrainType(relicAreaDefID, cTerrainNorseSnowGrass2);
+   rmAreaDefSetSize(relicAreaDefID, rmTilesToAreaFraction(30));
+   rmAreaDefSetCoherence(relicAreaDefID, 0.5);
+   rmAreaDefAddConstraint(relicAreaDefID, vDefaultAvoidImpassableLand);
+   rmAreaDefAddTerrainLayer(relicAreaDefID, cTerrainNorseSnowGrass3, 1, 2);
+
    // Relics.
    float avoidRelicMeters = 80.0;
 
-   int relicID = rmObjectDefCreate("relic");
-   rmObjectDefAddItem(relicID, cUnitTypeRelic, 1);
-   rmObjectDefAddConstraint(relicID, vDefaultAvoidEdge);
-   rmObjectDefAddConstraint(relicID, vDefaultRelicAvoidAll);
-   rmObjectDefAddConstraint(relicID, vDefaultRelicAvoidImpassableLand);
-   rmObjectDefAddConstraint(relicID, vDefaultAvoidTowerLOS);
-   rmObjectDefAddConstraint(relicID, vDefaultAvoidSettlementRange);
-   addObjectDefPlayerLocConstraint(relicID, 80.0);
-   addObjectLocsPerPlayer(relicID, false, 2 * getMapAreaSizeFactor(), 80.0, -1.0, avoidRelicMeters);
+   int relicLocID = rmObjectDefCreate("relic loc");
+   rmObjectDefAddConstraint(relicLocID, vDefaultAvoidEdge);
+   rmObjectDefAddConstraint(relicLocID, vDefaultRelicAvoidAll);
+   rmObjectDefAddConstraint(relicLocID, vDefaultRelicAvoidImpassableLand);
+   rmObjectDefAddConstraint(relicLocID, vDefaultRelicAvoidWater);
+   rmObjectDefAddConstraint(relicLocID, vDefaultAvoidTowerLOS);
+   rmObjectDefAddConstraint(relicLocID, vDefaultAvoidSettlementRange);
+   rmObjectDefAddConstraint(relicLocID, avoidCliffRamps);
+   addObjectDefPlayerLocConstraint(relicLocID, 80.0);
+   addObjectLocsPerPlayer(relicLocID, false, 2 * getMapAreaSizeFactor(), 80.0, -1.0, avoidRelicMeters);
 
-   generateLocs("relic locs");
+   // Run LocGen.
+   bool successfulRelics = generateLocs("relic locs", true, false, true, false);
+
+   // Get number of relic locations
+   int numRelicLocs = rmLocGenGetNumberLocs();
+
+   // For the tournament, we will only use these custom angles.
+   float[] angleCandidates = new float(1, cPiOver2);
+   angleCandidates.add(cPiOver2 * 0.45);
+   
+   int numAngleCandidates = angleCandidates.size();
+
+   for(int i = 0; i < numRelicLocs; i++)
+   {
+      // LocGen stuff.
+      vector relicLoc = rmLocGenGetLoc(i);
+
+      // Relic stuff.
+      float relicRotationAngle = angleCandidates[xsRandInt(0, numAngleCandidates - 1)];
+
+      int relicID = rmObjectDefCreateObject(relicDefID);
+      rmObjectSetItemRotation(relicID, 0, cItemRotateCustom, relicRotationAngle);
+      rmObjectPlaceAtLoc(relicID, 0, relicLoc);
+
+      // Generate the embellishment only if the relic is out of the ice.
+      if(rmIsTileAcceptableForConstraint(avoidCenter12, rmXFractionToTiles(relicLoc.x), rmZFractionToTiles(relicLoc.z)))
+      {
+         // Statue.
+         vector statueLoc = relicLoc.translateXZ(rmXTilesToFraction(1), relicRotationAngle);
+
+         float statueAngle = xsVectorAngleAroundY(statueLoc, relicLoc);
+
+         int statueID = rmObjectDefCreateObject(statueDefID);
+         rmObjectSetItemRotation(statueID, 0, cItemRotateCustom, statueAngle + cPiOver2);
+         rmObjectPlaceAtLoc(statueID, 0, statueLoc);
+
+         // Small Torches.
+         vector torchCLoc = relicLoc.translateXZ(rmXTilesToFraction(1), relicRotationAngle - cPiOver2);
+         vector torchDLoc = relicLoc.translateXZ(-rmXTilesToFraction(1), relicRotationAngle - cPiOver2);
+
+         int torchCID = rmObjectDefCreateObject(torchDefID);
+         rmObjectSetItemVariation(torchCID, 0, 0);
+         rmObjectPlaceAtLoc(torchCID, 0, torchCLoc);
+
+         int torchDID = rmObjectDefCreateObject(torchDefID);
+         rmObjectSetItemVariation(torchDID, 0, 0);
+         rmObjectPlaceAtLoc(torchDID, 0, torchDLoc);
+
+         // Relica area.
+         int relicAreaID = rmAreaDefCreateArea(relicAreaDefID);
+         rmAreaSetLoc(relicAreaID, relicLoc);
+         rmAreaBuild(relicAreaID);
+      }
+
+   }
+
+   if(successfulRelics)
+   {
+      // rmLocGenApply is not necessary here, since it would only be used for a dummy reference object 
+      // for angle reference and placement constraints.
+      resetLocGen();
+   }
    
    rmSetProgress(0.8);
 
-   // Forests.
-   float avoidForestMeters = 25.0;
-
-   int forestDefID = rmAreaDefCreate("forest");
-   rmAreaDefSetSizeRange(forestDefID, rmTilesToAreaFraction(80), rmTilesToAreaFraction(100));
-   rmAreaDefSetForestType(forestDefID, cForestNorsePineSnow);
-   rmAreaDefSetAvoidSelfDistance(forestDefID, avoidForestMeters);
-   rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidAll);
-   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidImpassableLand10);
-   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidSettlementWithFarm);
-   rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidTownCenter);
-   rmAreaDefAddConstraint(forestDefID, avoidCenter12);
-
-   // Starting forests.
-   if(gameIs1v1() == true)
-   {
-      addSimAreaLocsPerPlayerPair(forestDefID, 3, cStartingForestMinDist, cStartingForestMaxDist, avoidForestMeters);
-   }
-   else
-   {
-      addAreaLocsPerPlayer(forestDefID, 3, cStartingForestMinDist, cStartingForestMaxDist, avoidForestMeters);
-   }
-
-   generateLocs("starting forest locs");
-
    // Global forests.
+
+   // Now, they should definitely avoid the lake.
+   rmAreaDefAddConstraint(forestDefID, avoidCenter12);
+   
+   // We don't want any global forest to cause a player to have a extra starting forest.
+   rmAreaDefAddConstraint(forestDefID, createPlayerLocDistanceConstraint(45.0)); 
+   rmAreaDefAddOriginConstraint(forestDefID, createPlayerLocDistanceConstraint(65.0));
+   
    // Avoid the owner paths to prevent forests from closing off resources.
    rmAreaDefAddConstraint(forestDefID, vDefaultAvoidOwnerPaths, 0.0);
    // rmAreaDefSetConstraintBuffer(forestDefID, 0.0, 6.0);
@@ -487,13 +717,42 @@ void generate()
    rmSetProgress(0.9);
 
    // Embellishment.
+
    // Gold areas.
    buildAreaUnderObjectDef(startingGoldID, cTerrainNorseSnowRocks2, cTerrainNorseSnowRocks1, 6.0);
    buildAreaUnderObjectDef(bonusGoldID, cTerrainNorseSnowRocks2, cTerrainNorseSnowRocks1, 6.0);
 
    // Berries areas.
-   buildAreaUnderObjectDef(startingBerriesID, cTerrainNorseSnowGrass2, cTerrainNorseSnowGrass1, 8.0);
-   buildAreaUnderObjectDef(berriesID, cTerrainNorseSnowGrass2, cTerrainNorseSnowGrass1, 8.0);
+   buildAreaUnderObjectDef(startingBerriesID, cTerrainNorseSnowGrass2, cTerrainNorseSnowGrass1, 12.0);
+   buildAreaUnderObjectDef(berriesID, cTerrainNorseSnowGrass2, cTerrainNorseSnowGrass1, 12.0);
+
+   // Road avoidance.
+   int avoidRoad1 = rmCreateTerrainTypeDistanceConstraint(cTerrainNorseRoadSnow1, 2.5);
+   int avoidRoad2 = rmCreateTerrainTypeDistanceConstraint(cTerrainNorseRoadSnow2, 2.5);
+   
+   // Ice avoidance.
+   int avoidIce1 = rmCreateTerrainTypeDistanceConstraint(cTerrainDefaultIce1, 2.0);
+   int avoidIce2 = rmCreateTerrainTypeDistanceConstraint(cTerrainDefaultIce2, 2.0);
+   int avoidIce3 = rmCreateTerrainTypeDistanceConstraint(cTerrainDefaultIce3, 2.0);
+
+   // Rocks.
+   int rockTinyID = rmObjectDefCreate("rock tiny");
+   rmObjectDefAddItem(rockTinyID, cUnitTypeRockNorseTiny, 1);
+   rmObjectDefAddConstraint(rockTinyID, vDefaultEmbellishmentAvoidAll);
+   rmObjectDefAddConstraint(rockTinyID, vDefaultAvoidImpassableLand10);
+   rmObjectDefAddConstraint(rockTinyID, avoidIce1);
+   rmObjectDefAddConstraint(rockTinyID, avoidIce2);
+   rmObjectDefAddConstraint(rockTinyID, avoidIce3);
+   rmObjectDefPlaceAnywhere(rockTinyID, 0, 40 * cNumberPlayers * getMapAreaSizeFactor());
+
+   int rockSmallID = rmObjectDefCreate("rock small");
+   rmObjectDefAddItem(rockSmallID, cUnitTypeRockNorseSmall, 1);
+   rmObjectDefAddConstraint(rockSmallID, vDefaultEmbellishmentAvoidAll);
+   rmObjectDefAddConstraint(rockSmallID, vDefaultAvoidImpassableLand10);
+   rmObjectDefAddConstraint(rockSmallID, avoidIce1);
+   rmObjectDefAddConstraint(rockSmallID, avoidIce2);
+   rmObjectDefAddConstraint(rockSmallID, avoidIce3);
+   rmObjectDefPlaceAnywhere(rockSmallID, 0, 40 * cNumberPlayers * getMapAreaSizeFactor());
 
    // Random trees.
    int randomTreeID = rmObjectDefCreate("random tree");
@@ -503,44 +762,63 @@ void generate()
    rmObjectDefAddConstraint(randomTreeID, vDefaultTreeAvoidImpassableLand);
    rmObjectDefAddConstraint(randomTreeID, vDefaultTreeAvoidTree);
    rmObjectDefAddConstraint(randomTreeID, vDefaultAvoidSettlementWithFarm);
-   rmObjectDefAddConstraint(randomTreeID, avoidCenter12);
+   rmObjectDefAddConstraint(randomTreeID, avoidRoad1);
+   rmObjectDefAddConstraint(randomTreeID, avoidRoad2);
+   rmObjectDefAddConstraint(randomTreeID, avoidIce1);
+   rmObjectDefAddConstraint(randomTreeID, avoidIce2);
+   rmObjectDefAddConstraint(randomTreeID, avoidIce3);
    rmObjectDefPlaceAnywhere(randomTreeID, 0, 5 * cNumberPlayers * getMapAreaSizeFactor());
 
-   // Rocks.
-   int rockTinyID = rmObjectDefCreate("rock tiny");
-   rmObjectDefAddItem(rockTinyID, cUnitTypeRockNorseTiny, 1);
-   rmObjectDefAddConstraint(rockTinyID, vDefaultEmbellishmentAvoidAll);
-   rmObjectDefAddConstraint(rockTinyID, vDefaultEmbellishmentAvoidImpassableLand);
-   rmObjectDefAddConstraint(rockTinyID, avoidCenter4);
-   rmObjectDefPlaceAnywhere(rockTinyID, 0, 25 * cNumberPlayers * getMapAreaSizeFactor());
+   // Plants placement.
+   for(int i = 0; i < 7; i++)
+   {  
+      // Plants Stuff.
+      int plantID = cInvalidID;
+      string plantName = cEmptyString;
+      int plantsDensity= 25;
+      int plantsGroupDensity = 5;
 
-   int rockSmallID = rmObjectDefCreate("rock small");
-   rmObjectDefAddItem(rockSmallID, cUnitTypeRockNorseSmall, 1);
-   rmObjectDefAddConstraint(rockSmallID, vDefaultEmbellishmentAvoidAll);
-   rmObjectDefAddConstraint(rockSmallID, vDefaultEmbellishmentAvoidImpassableLand);
-   rmObjectDefAddConstraint(rockSmallID, avoidCenter4);
-   rmObjectDefPlaceAnywhere(rockSmallID, 0, 25 * cNumberPlayers * getMapAreaSizeFactor());
+      switch(i)
+      {
+         // Plants.
+         case 0: { plantID = cUnitTypePlantSnowBush; plantName = "plant bush "; break; }
+         case 1: { plantID = cUnitTypePlantSnowShrub; plantName = "plant shrub "; break; }
+         case 2: { plantID = cUnitTypePlantSnowFern; plantName = "plant fern "; break; }
+         case 3: { plantID = cUnitTypePlantSnowWeeds; plantName = "plant weeds "; break; }
+         case 4: { plantID = cUnitTypePlantSnowGrass; plantName = "plant grass "; plantsDensity *= 0.65; break; }
 
-   // Plants.
-   int plantGrassID = rmObjectDefCreate("plant shrub");
-   rmObjectDefAddItem(plantGrassID, cUnitTypePlantSnowGrass, 1);
-   rmObjectDefAddConstraint(plantGrassID, vDefaultEmbellishmentAvoidAll);
-   rmObjectDefAddConstraint(plantGrassID, avoidCenter4);
-   rmObjectDefAddConstraint(plantGrassID, vDefaultAvoidEdge);
-   rmObjectDefPlaceAnywhere(plantGrassID, 0, 40 * cNumberPlayers * getMapAreaSizeFactor());
-   
-   int plantFernID = rmObjectDefCreate("plant fern");
-   rmObjectDefAddItemRange(plantFernID, cUnitTypePlantSnowFern, 1, 2, 0.0, 4.0);
-   rmObjectDefAddConstraint(plantFernID, vDefaultEmbellishmentAvoidAll);
-   rmObjectDefAddConstraint(plantFernID, avoidCenter4);
-   rmObjectDefPlaceAnywhere(plantFernID, 0, 30 * cNumberPlayers * getMapAreaSizeFactor());
-   
-   int plantWeedsID = rmObjectDefCreate("plant weeds");
-   rmObjectDefAddItemRange(plantWeedsID, cUnitTypePlantSnowWeeds, 1, 3, 0.0, 4.0);
-   rmObjectDefAddConstraint(plantWeedsID, vDefaultEmbellishmentAvoidAll);
-   rmObjectDefAddConstraint(plantWeedsID, avoidCenter4);
-   rmObjectDefPlaceAnywhere(plantWeedsID, 0, 20 * cNumberPlayers * getMapAreaSizeFactor());
-   
+         // Plants groups.
+         case 5: { plantID = cUnitTypePlantSnowFern; plantName = "plant fern group "; plantsDensity = plantsGroupDensity; break; }
+         case 6: { plantID = cUnitTypePlantSnowWeeds; plantName = "plant weeds group "; plantsDensity = plantsGroupDensity; break; }
+      }
+      
+      // Plant template.
+      int plantTypeDef = rmObjectDefCreate(plantName);
+      if(i < 5)
+      {
+         rmObjectDefAddItem(plantTypeDef, plantID, 1);
+      }
+      else
+      {
+         rmObjectDefAddItemRange(plantTypeDef, plantID, 1, 3, 0.0, 4.0);
+      }
+      rmObjectDefAddConstraint(plantTypeDef, vDefaultEmbellishmentAvoidAll);
+      rmObjectDefAddConstraint(plantTypeDef, vDefaultAvoidImpassableLand2);
+      rmObjectDefAddConstraint(plantTypeDef, vDefaultEmbellishmentAvoidWater); 
+      rmObjectDefAddConstraint(plantTypeDef, avoidRoad1);
+      rmObjectDefAddConstraint(plantTypeDef, avoidRoad2);
+      rmObjectDefAddConstraint(plantTypeDef, avoidIce1);
+      rmObjectDefAddConstraint(plantTypeDef, avoidIce2);
+      rmObjectDefAddConstraint(plantTypeDef, avoidIce3);
+      if(i == 4)
+      {
+         rmObjectDefAddConstraint(plantTypeDef, vDefaultAvoidEdge);
+      }
+
+      // Plant Placement.
+      rmObjectDefPlaceAnywhere(plantTypeDef, 0, plantsDensity * cNumberPlayers * getMapAreaSizeFactor());
+   }
+
    // Snow VFX.
    int snowDriftPlainID = rmObjectDefCreate("snow drift plain");
    rmObjectDefAddItem(snowDriftPlainID, cUnitTypeVFXSnowDriftPlain, 1);
