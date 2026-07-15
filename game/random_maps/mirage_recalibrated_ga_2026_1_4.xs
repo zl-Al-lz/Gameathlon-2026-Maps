@@ -1,5 +1,11 @@
 include "lib2/rm_core.xs";
 
+/*
+** Mirage | Recalibrated | 
+** Treatment for Gameathlon by AL
+** Date: June 14, 2026
+*/
+
 void generate()
 {
    rmSetProgress(0.0);
@@ -64,6 +70,12 @@ void generate()
    // Default tree type.
    rmSetDefaultTreeType(cUnitTypeTreePalm);
 
+   // Gameathlon stuff.
+   bool isTournamentSeason = true; 
+
+   // Ensure that settlements, gold mines, hunts and areas share the same side.
+   int sharedSide = xsRandBool(0.5) ? cLocSideSame : cLocSideOpposite;
+
    rmSetProgress(0.1);
 
    // Create oceans.
@@ -73,15 +85,11 @@ void generate()
    {
       int oceanID = rmAreaCreate("ocean " + i);
       rmAreaSetLoc(oceanID, vectorXZ(0.0 + i, 0.5));
-
       rmAreaSetWaterType(oceanID, cWaterEgyptSea);
-
       rmAreaSetEdgeSmoothDistance(oceanID, 2);
-
       if(gameIs1v1() == true)
       {  
          oceanAreaSize = 0.1;
-
          rmAreaSetSize(oceanID, oceanAreaSize);
          rmAreaAddInfluenceSegment(oceanID, vectorXZ(i, 0.35), vectorXZ(i, 0.65));
          rmAreaSetCoherence(oceanID, 0.5);
@@ -89,7 +97,6 @@ void generate()
       else
       {
          oceanAreaSize = 0.125;
-
          rmAreaSetSize(oceanID, oceanAreaSize);
          rmAreaAddInfluenceSegment(oceanID, vectorXZ(i, 0.0), vectorXZ(i, 1.0));
       }
@@ -101,21 +108,17 @@ void generate()
    int heightNoiseAreaID = rmAreaCreate("height noise");
    rmAreaSetSize(heightNoiseAreaID, 1.0);
    rmAreaSetLoc(heightNoiseAreaID, cCenterLoc);
-
-   // Don't get too close to the water.
-   rmAreaAddConstraint(heightNoiseAreaID, vDefaultAvoidWater20);
-
+   rmAreaAddConstraint(heightNoiseAreaID, vDefaultAvoidWater20); // Don't get too close to the water.
    rmAreaSetHeightNoise(heightNoiseAreaID, cNoiseFractalSum, 6.0, 0.04, 2, 0.5);
    rmAreaSetHeightNoiseBias(heightNoiseAreaID, 1.0); // Only grow upwards.
-
    rmAreaAddHeightBlend(heightNoiseAreaID, cBlendAll, cFilter5x5Gaussian, 5, 5, true);
-
    rmAreaBuild(heightNoiseAreaID);
 
    rmSetProgress(0.2);
 
    // Beautify player areas.
    int playerAreaClassID = rmClassCreate();
+
    float playerAreaSize = rmRadiusToAreaFraction(35.0);
 
    for(int i = 1; i <= cNumberPlayers; i++)
@@ -125,15 +128,12 @@ void generate()
       int playerAreaID = rmAreaCreate("player area " + p);
       rmAreaSetSize(playerAreaID, playerAreaSize);
       rmAreaSetLocPlayer(playerAreaID, p);
-
       rmAreaAddTerrainLayer(playerAreaID, cTerrainEgyptGrassDirt2, 0, 1);
       rmAreaAddTerrainLayer(playerAreaID, cTerrainEgyptGrassDirt1, 1, 2);
       rmAreaAddTerrainLayer(playerAreaID, cTerrainEgyptGrass1, 2, 4);
       rmAreaSetTerrainType(playerAreaID, cTerrainEgyptGrass2);
-
       rmAreaAddConstraint(playerAreaID, vDefaultAvoidWater12);
       rmAreaAddToClass(playerAreaID, playerAreaClassID);
-
       rmAreaBuild(playerAreaID);
    }
 
@@ -145,32 +145,84 @@ void generate()
    // Starting towers.
    int startingTowerID = rmObjectDefCreate("starting tower");
    rmObjectDefAddItem(startingTowerID, cUnitTypeSentryTower, 1);
-   addObjectLocsPerPlayer(startingTowerID, true, 4, cStartingTowerMinDist, cStartingTowerMaxDist, cStartingTowerAvoidanceMeters);
+   if(gameIs1v1())
+   {
+      addSimObjectLocsPerPlayerPair(startingTowerID, true, 4, cStartingTowerMinDist, cStartingTowerMaxDist, cStartingTowerAvoidanceMeters);
+   }
+   else
+   {
+      addObjectLocsPerPlayer(startingTowerID, true, 4, cStartingTowerMinDist, cStartingTowerMaxDist, cStartingTowerAvoidanceMeters);
+   }
+   
    generateLocs("starting tower locs");
 
-   // 1v1: Determine manually whether the back settlements should be on the same side or not.
-   // Note that the gold mines will respect this in 1v1 to avoid a very safe mine for one player.
-   int settlementSide = (xsRandBool(0.5) == true) ? cLocSideSame : cLocSideOpposite;
+   // Disable TOB conversion or they might be floating in the air due to blending after painting.
+   rmSetTOBConversion(false);
+
+   // Cliff definition.
+   float avoidGorgeMeters = gameIs1v1() ? 50.0 : 35.0;
+
+   float cliffAreaSize = rmTilesToAreaFraction(450);
+
+   int numCliffsPerPlayer = 2;
+
+   int cliffAvoidBuilding = rmCreateTypeDistanceConstraint(cUnitTypeBuilding, 20.0);
+   int cliffOriginAvoidEdge = createSymmetricBoxConstraint(rmXTilesToFraction(10), rmZTilesToFraction(10));
+
+   int cliffID = rmAreaDefCreate("cliff");
+   rmAreaDefSetMix(cliffID, baseMixID);
+   rmAreaDefSetCliffType(cliffID, cCliffEgyptSand);
+   rmAreaDefSetCliffSideRadius(cliffID, 0, 2);
+   rmAreaDefSetCliffRamps(cliffID, 2, 0.25, 0.0, 1.0);
+   rmAreaDefSetCliffRampSteepness(cliffID, 25.0);
+   rmAreaDefSetCliffEmbellishmentDensity(cliffID, 0.1);
+   rmAreaDefSetSizeRange(cliffID, cliffAreaSize * 0.8, cliffAreaSize * 1.2);
+   rmAreaDefSetAvoidSelfDistance(cliffID, avoidGorgeMeters);
+   rmAreaDefSetHeightRelative(cliffID, -8.0);
+   int cliffSideBlendIdx = rmAreaDefAddHeightBlend(cliffID, cBlendCliffSide, cFilter3x3Gaussian, 1);
+   int cliffRampBlendIdx = rmAreaDefAddHeightBlend(cliffID, cBlendCliffRamp, cFilter5x5Gaussian, 10, 10, true, true);
+   rmAreaDefAddHeightBlendExpansionConstraint(cliffID, cliffRampBlendIdx, vDefaultAvoidImpassableLand);
+   rmAreaDefSetBlobs(cliffID, 1, 4);
+   rmAreaDefSetBlobDistance(cliffID, 0.0, 15.0);
+   rmAreaDefSetConstraintBuffer(cliffID, 5.0, 10.0);
+   rmAreaDefSetOriginConstraintBuffer(cliffID, 20.0);
+   rmAreaDefAddConstraint(cliffID, vDefaultAvoidWater18);
+   rmAreaDefAddConstraint(cliffID, cliffAvoidBuilding);
+   rmAreaDefAddConstraint(cliffID, createPlayerLocDistanceConstraint(55.0));
+   rmAreaDefAddOriginConstraint(cliffID, cliffOriginAvoidEdge); // Only the origin vector.
+   if(gameIs1v1())
+   {
+      int bonusCliffID = rmAreaDefCreateArea(cliffID);
+      rmAreaSetLoc(bonusCliffID, cCenterLoc);
+      rmAreaBuild(bonusCliffID);
+   }
 
    // Settlements.
+   int settlementAvoidCenter = rmCreateLocDistanceConstraint(cCenterLoc, 40.0);
+
    int firstSettlementID = rmObjectDefCreate("first settlement");
    rmObjectDefAddItem(firstSettlementID, cUnitTypeSettlement, 1);
    rmObjectDefAddConstraint(firstSettlementID, vDefaultSettlementAvoidEdge);
    rmObjectDefAddConstraint(firstSettlementID, vDefaultSettlementAvoidSiegeShipRange);
+   rmObjectDefAddConstraint(firstSettlementID, vDefaultSettlementAvoidImpassableLand);
    rmObjectDefAddConstraint(firstSettlementID, vDefaultAvoidTowerLOS);
+   rmObjectDefAddConstraint(firstSettlementID, settlementAvoidCenter);
 
    int secondSettlementID = rmObjectDefCreate("second settlement");
    rmObjectDefAddItem(secondSettlementID, cUnitTypeSettlement, 1);
    rmObjectDefAddConstraint(secondSettlementID, vDefaultSettlementAvoidEdge);
    rmObjectDefAddConstraint(secondSettlementID, vDefaultSettlementAvoidSiegeShipRange);
+   rmObjectDefAddConstraint(secondSettlementID, vDefaultSettlementAvoidImpassableLand);
    rmObjectDefAddConstraint(secondSettlementID, vDefaultAvoidTowerLOS);
    rmObjectDefAddConstraint(secondSettlementID, vDefaultAvoidKotH);
-
+   rmObjectDefAddConstraint(secondSettlementID, settlementAvoidCenter);
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(firstSettlementID, false, 1, 60.0, 80.0, cSettlementDist1v1, cBiasBackward,
-                          cInAreaDefault, settlementSide);
-      addSimObjectLocsPerPlayerPair(secondSettlementID, false, 1, 70.0, 100.0, cSettlementDist1v1, cBiasAggressive);
+      addSimObjectLocsPerPlayerPair(firstSettlementID, false, 1, 60.0, 80.0, cSettlementDist1v1 * 1.15, cBiasBackward,
+                                    cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
+
+      addSimObjectLocsPerPlayerPair(secondSettlementID, false, 1, 70.0, 100.0, cSettlementDist1v1 * 1.15, cBiasAggressive, 
+                                    cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -189,6 +241,7 @@ void generate()
       rmObjectDefAddItem(bonusSettlementID, cUnitTypeSettlement, 1);
       rmObjectDefAddConstraint(bonusSettlementID, vDefaultSettlementAvoidEdge);
       rmObjectDefAddConstraint(bonusSettlementID, vDefaultSettlementAvoidSiegeShipRange);
+      rmObjectDefAddConstraint(bonusSettlementID, vDefaultSettlementAvoidImpassableLand);
       rmObjectDefAddConstraint(bonusSettlementID, vDefaultAvoidTowerLOS);
       rmObjectDefAddConstraint(bonusSettlementID, vDefaultAvoidKotH);
       addObjectLocsPerPlayer(bonusSettlementID, false, 1 * getMapAreaSizeFactor(), 90.0, -1.0, 100.0);
@@ -196,55 +249,38 @@ void generate()
 
    generateLocs("settlement locs");
 
+
    rmSetProgress(0.4);
 
-   // Create some cliffs/gorges.
-   int numCliffsPerPlayer = (gameIs1v1() == true) ? xsRandInt(2, 3) : 2;
-   int numCliffs = numCliffsPerPlayer * cNumberPlayers * getMapAreaSizeFactor();
-   float cliffAreaSize = rmTilesToAreaFraction(450);
-
-   int cliffClassID = rmClassCreate();
-   int cliffAvoidSelf = rmCreateClassDistanceConstraint(cliffClassID, 35.0);
-   int cliffAvoidEdge = createSymmetricBoxConstraint(rmXMetersToFraction(10.0), rmZMetersToFraction(10.0));
-   int cliffAvoidBuilding = rmCreateTypeDistanceConstraint(cUnitTypeBuilding, 20.0);
-   int cliffAvoidPlayer = createPlayerLocDistanceConstraint(30.0);
-
-   for(int i = 0; i < numCliffs; i++)
+   // Cliff locs placement.
+   if(gameIs1v1())
    {
-      int cliffID = rmAreaCreate("cliff " + i);
+      addSimAreaLocsPerPlayerPair(cliffID, 1, 65.0, 80.0, avoidGorgeMeters * 1.25, cBiasForward, cInAreaDefault, 
+                                 isTournamentSeason ? sharedSide : cLocSideRandom);
 
-      rmAreaSetSize(cliffID, xsRandFloat(0.8, 1.2) * cliffAreaSize);
-      rmAreaSetCliffType(cliffID, cCliffEgyptSand);
-      rmAreaSetCliffSideRadius(cliffID, 0, 2);
-      rmAreaSetCliffRamps(cliffID, 2, 0.25, 0.0, 1.0);
-      rmAreaSetCliffRampSteepness(cliffID, 1.25);
-      rmAreaSetCliffEmbellishmentDensity(cliffID, 0.1);
+      addSimAreaLocsPerPlayerPair(cliffID, 1, 75.0, 125.0, avoidGorgeMeters * 1.25, cBiasNotDefensive, 
+                                 cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
 
-      rmAreaSetHeightRelative(cliffID, -8.0);
-      rmAreaAddHeightBlend(cliffID, cBlendAll, cFilter5x5Box);
-      rmAreaSetBlobs(cliffID, 1, 4);
-      rmAreaSetBlobDistance(cliffID, 0.0, 15.0);
-
-      // Chance to avoid edges.
-      if(xsRandBool(0.5) == true)
+      if(cMapSizeCurrent > cMapSizeStandard)
       {
-         rmAreaAddConstraint(cliffID, cliffAvoidEdge);
+         addAreaLocsPerPlayer(cliffID, 1 * getMapAreaSizeFactor(), 80.0, -1.0, avoidGorgeMeters * 1.25);
       }
-      rmAreaAddConstraint(cliffID, cliffAvoidSelf);
-      rmAreaAddConstraint(cliffID, cliffAvoidPlayer);
-      rmAreaAddConstraint(cliffID, cliffAvoidBuilding);
-      rmAreaAddConstraint(cliffID, vDefaultAvoidWater20);
-      rmAreaSetConstraintBuffer(cliffID, 5.0, 10.0);
-      rmAreaSetOriginConstraintBuffer(cliffID, 20.0);
 
-      rmAreaAddToClass(cliffID, cliffClassID);
-
-      rmAreaBuild(cliffID);
+      generateLocs("gorge locs");
+   }
+   else
+   {
+      // Unchecked.
+      buildAreaDefInTeamAreas(cliffID, numCliffsPerPlayer * getMapAreaSizeFactor());
    }
 
+   // Enable TOB conversion.
+   rmSetTOBConversion(true);
+   
    rmSetProgress(0.5);
 
    // Starting objects.
+
    // Starting gold.
    int startingGoldID = rmObjectDefCreate("starting gold");
    rmObjectDefAddItem(startingGoldID, cUnitTypeMineGoldMedium, 1);
@@ -254,8 +290,15 @@ void generate()
    rmObjectDefAddConstraint(startingGoldID, vDefaultGoldAvoidWater);
    rmObjectDefAddConstraint(startingGoldID, vDefaultStartingGoldAvoidTower);
    rmObjectDefAddConstraint(startingGoldID, vDefaultForceStartingGoldNearTower);
-   addObjectLocsPerPlayer(startingGoldID, false, 1, cStartingGoldMinDist, cStartingGoldMaxDist, cStartingObjectAvoidanceMeters);
-
+   if(gameIs1v1())
+   {
+      addSimObjectLocsPerPlayerPair(startingGoldID, false, 1, cStartingGoldMinDist, cStartingGoldMaxDist, cStartingObjectAvoidanceMeters);
+   }
+   else
+   {
+      addObjectLocsPerPlayer(startingGoldID, false, 1, cStartingGoldMinDist, cStartingGoldMaxDist, cStartingObjectAvoidanceMeters);
+   }
+   
    generateLocs("starting gold locs");
 
    // Berries.
@@ -275,14 +318,7 @@ void generate()
    rmObjectDefAddConstraint(startingHuntID, vDefaultFoodAvoidImpassableLand);
    rmObjectDefAddConstraint(startingHuntID, vDefaultFoodAvoidWater);
    rmObjectDefAddConstraint(startingHuntID, vDefaultForceInTowerLOS);
-   if(gameIs1v1() == true)
-   {
-      addSimObjectLocsPerPlayerPair(startingHuntID, false, 1, cStartingHuntMinDist, cStartingHuntMaxDist, cStartingObjectAvoidanceMeters);
-   }
-   else
-   {
-      addObjectLocsPerPlayer(startingHuntID, false, 1, cStartingHuntMinDist, cStartingHuntMaxDist, cStartingObjectAvoidanceMeters);
-   }
+   addObjectLocsPerPlayer(startingHuntID, false, 1, cStartingHuntMinDist, cStartingHuntMaxDist, cStartingObjectAvoidanceMeters);
 
    // Chicken.
    int startingChickenID = rmObjectDefCreate("starting chicken");
@@ -304,10 +340,31 @@ void generate()
 
    generateLocs("starting food locs");
 
+   // Forests.
+   // Mirage needs palms, not savannah trees so only place those.
+   float avoidForestMeters = 30.0;
+
+   int forestDefID = rmAreaDefCreate("forest");
+   rmAreaDefSetSizeRange(forestDefID, rmTilesToAreaFraction(50), rmTilesToAreaFraction(70));
+   rmAreaDefSetForestType(forestDefID, cForestEgyptPalm);
+   rmAreaDefSetAvoidSelfDistance(forestDefID, avoidForestMeters);
+   rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidAll);
+   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidImpassableLand8);
+   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidWater8);
+   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidSettlementWithFarm);
+   rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidTownCenter);
+   rmAreaDefAddOriginConstraint(forestDefID, vDefaultAvoidWater16);
+   rmAreaDefAddOriginConstraint(forestDefID, vDefaultAvoidImpassableLand12);
+
+   // Starting forests.
+   addAreaLocsPerPlayer(forestDefID, 3, cStartingForestMinDist, cStartingForestMaxDist, avoidForestMeters + 5.0);
+
+   generateLocs("starting forest locs");
+
    rmSetProgress(0.6);
 
    // Gold.
-   float avoidGoldMeters = 50.0;
+   float avoidGoldMeters = 55.0;
 
    // Close gold.
    int closeGoldID = rmObjectDefCreate("close gold");
@@ -321,8 +378,11 @@ void generate()
    addObjectDefPlayerLocConstraint(closeGoldID, 65.0);
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(closeGoldID, false, 1, 50.0, 70.0, avoidGoldMeters, cBiasNotDefensive, settlementSide);
-      addSimObjectLocsPerPlayerPair(closeGoldID, false, 1, 50.0, 100.0, avoidGoldMeters, cBiasNotDefensive, settlementSide);
+      addSimObjectLocsPerPlayerPair(closeGoldID, false, 1, 50.0, 70.0, avoidGoldMeters, cBiasNotDefensive, 
+                                    cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
+
+      addSimObjectLocsPerPlayerPair(closeGoldID, false, 1, 50.0, 100.0, avoidGoldMeters, cBiasNotDefensive, 
+                                    cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -342,7 +402,8 @@ void generate()
 
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(bonusGoldID, false, 2 * getMapAreaSizeFactor(), 80.0, -1.0, avoidGoldMeters, cBiasForward, settlementSide);
+      addSimObjectLocsPerPlayerPair(bonusGoldID, false, 2 * getMapAreaSizeFactor(), 80.0, -1.0, avoidGoldMeters, cBiasForward, 
+                                    cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -366,7 +427,8 @@ void generate()
    addObjectDefPlayerLocConstraint(closeHuntID, 60.0);
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(closeHuntID, false, 1, 60.0, 80.0, avoidHuntMeters, cBiasNotDefensive);
+      addSimObjectLocsPerPlayerPair(closeHuntID, false, 1, 60.0, 80.0, avoidHuntMeters, cBiasNotDefensive, cInAreaDefault, 
+                                    isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -392,7 +454,8 @@ void generate()
    addObjectDefPlayerLocConstraint(bonusHunt1ID, 80.0);
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(bonusHunt1ID, false, 1, 80.0, -1.0, avoidHuntMeters, cBiasNotDefensive);
+      addSimObjectLocsPerPlayerPair(bonusHunt1ID, false, 1, 80.0, -1.0, avoidHuntMeters, cBiasNotDefensive, cInAreaDefault, 
+                                    isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -418,7 +481,8 @@ void generate()
    addObjectDefPlayerLocConstraint(bonusHunt2ID, 80.0);
    if(gameIs1v1() == true)
    {
-      addSimObjectLocsPerPlayerPair(bonusHunt2ID, false, 1, 80.0, -1.0, avoidHuntMeters, cBiasNotDefensive);
+      addSimObjectLocsPerPlayerPair(bonusHunt2ID, false, 1, 80.0, -1.0, avoidHuntMeters, cBiasNotDefensive, cInAreaDefault, 
+                                    isTournamentSeason ? sharedSide : cLocSideRandom);
    }
    else
    {
@@ -568,39 +632,17 @@ void generate()
 
    rmSetProgress(0.8);
 
-   // Forests.
-   // Mirage needs palms, not savannah trees so only place those.
-   float avoidForestMeters = 30.0;
-
-   int forestDefID = rmAreaDefCreate("forest");
-   rmAreaDefSetSizeRange(forestDefID, rmTilesToAreaFraction(50), rmTilesToAreaFraction(70));
-   rmAreaDefSetForestType(forestDefID, cForestEgyptPalm);
-   rmAreaDefSetAvoidSelfDistance(forestDefID, avoidForestMeters);
-   rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidAll);
-   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidImpassableLand8);
-   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidWater8);
-   rmAreaDefAddConstraint(forestDefID, vDefaultAvoidSettlementWithFarm);
-   rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidTownCenter);
-
-   // Starting forests.
-   if(gameIs1v1() == true)
-   {
-      addSimAreaLocsPerPlayerPair(forestDefID, 3, cStartingForestMinDist, cStartingForestMaxDist, avoidForestMeters);
-   }
-   else
-   {
-      addAreaLocsPerPlayer(forestDefID, 3, cStartingForestMinDist, cStartingForestMaxDist, avoidForestMeters);
-   }
-
-   generateLocs("starting forest locs");
-
    // Global forests.
    // Avoid the owner paths to prevent forests from closing off resources.
    rmAreaDefAddConstraint(forestDefID, vDefaultAvoidOwnerPaths, 0.0);
    // rmAreaDefSetConstraintBuffer(forestDefID, 0.0, 6.0);
 
+   // We don't want any global forest to cause a player to have a extra starting forest.
+   rmAreaDefAddConstraint(forestDefID, createPlayerLocDistanceConstraint(45.0)); 
+   rmAreaDefAddOriginConstraint(forestDefID, createPlayerLocDistanceConstraint(65.0));
+
    // Build for each player in the team area.
-   buildAreaDefInTeamAreas(forestDefID, 6 * getMapAreaSizeFactor());
+   buildAreaDefInTeamAreas(forestDefID, 8 * getMapAreaSizeFactor());
 
    // Stragglers.
    placeStartingStragglers(cUnitTypeTreePalm);
@@ -608,6 +650,7 @@ void generate()
    rmSetProgress(0.9);
 
    // Beautification.
+
    // Gold areas.
    buildAreaUnderObjectDef(startingGoldID, cTerrainEgyptGrassRocks2, cTerrainEgyptGrassRocks1, 6.0);
    buildAreaUnderObjectDef(closeGoldID, cTerrainEgyptDirtRocks2, cTerrainEgyptDirtRocks1, 6.0);

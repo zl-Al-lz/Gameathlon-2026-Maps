@@ -1,6 +1,6 @@
 ﻿<?xml version = "1.0" encoding = "UTF-8"?>
 <mapinfo 
-    displayName = "GA 2026 - Elysium - Recalibrated 1.3" 
+    displayName = "GA 2026 - Elysium - Recalibrated 1.4" 
     details = "STR_MAP_ELYSIUM_DESC" 
     loadDetails="STR_MAP_ELYSIUM_DESC_LOAD"
     imagepath = "resources\maps\map_picker\Elysium_Recalibrated.png" 

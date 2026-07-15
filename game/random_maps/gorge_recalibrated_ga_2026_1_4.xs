@@ -27,7 +27,7 @@ vector modSwapVectorAxis(float x = 0.0, float z = 0.0, bool booleanRotation = fa
 
 vector modVectorLerp(vector A = cInvalidVector, vector B = cInvalidVector, float t = 0.0)
 {
-   return vector(A.x + (B.x - A.x) * t, A.y + (B.y - A.y) * t, A.z + (B.z - A.z) * t);
+   return A + (B - A) * t;
 }
 
 void generate()
@@ -96,12 +96,7 @@ void generate()
    }
 
    rmSetDefaultTreeType(defaultTreeType);
-
-   // Biome Assets.
-   int mapForestType = sichuanHighlandsCustomForestID;
-   int mapCliffType = cCliffChineseGrass;
-   int mapCliffTerrainType = cTerrainChineseCliff1;
-
+   
    // Pandoras Box 2 & Gameathlon stuff.
    bool isTournamentSeason = true; 
 
@@ -246,7 +241,7 @@ void generate()
    rmAreaDefSetSize(cliffDefID, cliffSize);
    rmAreaDefSetCoherence(cliffDefID, 0.35);
    rmAreaDefSetCoherenceSquare(cliffDefID, true);
-   rmAreaDefSetCliffType(cliffDefID, mapCliffType);
+   rmAreaDefSetCliffType(cliffDefID, cCliffChineseGrass);
    rmAreaDefSetCliffEmbellishmentDensity(cliffDefID, 0.55);
    rmAreaDefSetCliffSideRadius(cliffDefID, 1, 2);
    rmAreaDefSetCliffSideSheernessThreshold(cliffDefID, degToRad(65));
@@ -351,7 +346,7 @@ void generate()
 
    int cliffForestDefID = rmAreaDefCreate("cliff forest");
    rmAreaDefSetSizeRange(cliffForestDefID, rmTilesToAreaFraction(10), rmTilesToAreaFraction(17));
-   rmAreaDefSetForestType(cliffForestDefID, mapForestType);
+   rmAreaDefSetForestType(cliffForestDefID, sichuanHighlandsCustomForestID);
    rmAreaDefSetAvoidSelfDistance(cliffForestDefID, 10.0);
    rmAreaDefAddConstraint(cliffForestDefID, vDefaultAvoidImpassableLand);
    rmAreaDefAddConstraint(cliffForestDefID, vDefaultAvoidSettlementWithFarm);
@@ -363,7 +358,7 @@ void generate()
 
    // Each player will have one additional large forest.
    int gorgeSpecialForestDefID = rmAreaDefCreate("gorge forests");
-   rmAreaDefSetForestType(gorgeSpecialForestDefID, mapForestType);
+   rmAreaDefSetForestType(gorgeSpecialForestDefID, sichuanHighlandsCustomForestID);
    rmAreaDefSetCoherence(gorgeSpecialForestDefID, 0.35);
    rmAreaDefSetEdgePerturbDistance(gorgeSpecialForestDefID, -3.5, 0.5, false);
    rmAreaDefAddConstraint(gorgeSpecialForestDefID, vDefaultForestAvoidAll);
@@ -609,7 +604,7 @@ void generate()
 
    int forestDefID = rmAreaDefCreate("forest");
    rmAreaDefSetSizeRange(forestDefID, rmTilesToAreaFraction(35), rmTilesToAreaFraction(45));
-   rmAreaDefSetForestType(forestDefID, mapForestType);
+   rmAreaDefSetForestType(forestDefID, sichuanHighlandsCustomForestID);
    rmAreaDefSetAvoidSelfDistance(forestDefID, avoidForestMeters);
    rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidAll);
    rmAreaDefAddConstraint(forestDefID, vDefaultAvoidWater6);
@@ -970,7 +965,7 @@ void generate()
 
    int hillForestDefID = rmAreaDefCreate("hill global forest");
    rmAreaDefSetSizeRange(hillForestDefID, rmTilesToAreaFraction(40), rmTilesToAreaFraction(55));
-   rmAreaDefSetForestType(hillForestDefID, mapForestType);
+   rmAreaDefSetForestType(hillForestDefID, sichuanHighlandsCustomForestID);
    rmAreaDefSetAvoidSelfDistance(hillForestDefID, avoidHillForestMeters);
    rmAreaDefSetBlobs(hillForestDefID, 0, 2);
    rmAreaDefSetBlobDistance(hillForestDefID, 5.0, 10.0);
@@ -1001,7 +996,7 @@ void generate()
 
    int tinyGlobalForestDefID = rmAreaDefCreate("tiny forest");
    rmAreaDefSetSizeRange(tinyGlobalForestDefID, rmTilesToAreaFraction(10), rmTilesToAreaFraction(15));
-   rmAreaDefSetForestType(tinyGlobalForestDefID, mapForestType);
+   rmAreaDefSetForestType(tinyGlobalForestDefID, sichuanHighlandsCustomForestID);
    rmAreaDefSetAvoidSelfDistance(tinyGlobalForestDefID, avoidTinyForestMeters);
    rmAreaDefAddConstraint(tinyGlobalForestDefID, vDefaultForestAvoidAll);
    rmAreaDefAddConstraint(tinyGlobalForestDefID, vDefaultAvoidWater6);

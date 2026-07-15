@@ -65,10 +65,6 @@ void generate()
 
    rmSetDefaultTreeType(defaultTreeType);
 
-   // Biome Assets.
-   int mapForestType = cForestGreekOak;
-   int mapWaterType = cWaterGreekSea;
-
    // By request, we’ll use only one shared herd for the tournament.
    float mapHerdType = (xsRandBool(0.5) == true) ? cUnitTypeGoat : cUnitTypePig;
 
@@ -79,10 +75,10 @@ void generate()
    int sharedSide = xsRandBool(0.5) ? cLocSideOpposite : cLocSideSame;
 
    // Water overrides.
-   rmWaterTypeAddBeachLayer(mapWaterType, cTerrainGreekBeach1, 2.0, 0.0);
-   rmWaterTypeAddBeachLayer(mapWaterType, cTerrainGreekGrassDirt3, 4.0, 0.0);
-   rmWaterTypeAddBeachLayer(mapWaterType, cTerrainGreekGrassDirt2, 6.0, 0.0);
-   rmWaterTypeAddBeachLayer(mapWaterType, cTerrainGreekGrassDirt1, 8.0, 0.0);
+   rmWaterTypeAddBeachLayer(cWaterGreekSea, cTerrainGreekBeach1, 2.0, 0.0);
+   rmWaterTypeAddBeachLayer(cWaterGreekSea, cTerrainGreekGrassDirt3, 4.0, 0.0);
+   rmWaterTypeAddBeachLayer(cWaterGreekSea, cTerrainGreekGrassDirt2, 6.0, 0.0);
+   rmWaterTypeAddBeachLayer(cWaterGreekSea, cTerrainGreekGrassDirt1, 8.0, 0.0);
 
    // Map size and terrain init.
    int axisSize = (gameIs1v1() == true) ? 137 : 130;
@@ -122,8 +118,8 @@ void generate()
    rmAddGlobalHeightNoise(cNoiseFractalSum, 4.0, 0.04, 2, 0.5);
 
    // Player base areas.
-   int playerAreaClassID = rmClassCreate("player area class");
-   int avoidPlayerArea = rmCreateClassDistanceConstraint(playerAreaClassID, 1.0, cClassAreaDistance, "pond vs player area");
+   int playerAreaClassID = rmClassCreate();
+   int avoidPlayerArea = rmCreateClassDistanceConstraint(playerAreaClassID, 1.0);
 
    float playerBaseAreaSize = rmRadiusToAreaFraction(33.0);
 
@@ -146,7 +142,7 @@ void generate()
    for(int i = 0; i < 4; i++)
    {
       int pondID = rmAreaCreate("pond " + i);
-      rmAreaSetWaterType(pondID, mapWaterType);
+      rmAreaSetWaterType(pondID, cWaterGreekSea);
       rmAreaSetSize(pondID, pondSize); 
       rmAreaSetCoherence(pondID, 0.1);
       rmAreaSetEdgeSmoothDistance(pondID, 1, false);
@@ -171,7 +167,6 @@ void generate()
          rmAreaSetLoc(pondID, vectorXZ(0.99, 0.5));
          rmAreaAddInfluenceSegment(pondID, vectorXZ(0.99, 0.375), vectorXZ(0.99, 0.625));
       }
-
       rmAreaAddConstraint(pondID, avoidPlayerArea);
    }  
    
@@ -353,7 +348,7 @@ void generate()
 
    int forestDefID = rmAreaDefCreate("forest");
    rmAreaDefSetSizeRange(forestDefID, rmTilesToAreaFraction(75), rmTilesToAreaFraction(85));
-   rmAreaDefSetForestType(forestDefID, mapForestType);
+   rmAreaDefSetForestType(forestDefID, cForestGreekOak);
    rmAreaDefSetAvoidSelfDistance(forestDefID, avoidForestMeters);
    rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidAll);
    rmAreaDefAddConstraint(forestDefID, vDefaultAvoidWater6);
@@ -370,7 +365,7 @@ void generate()
    rmSetProgress(0.4);
 
    // Gold.
-   float avoidGoldMeters = 50.0;
+   float avoidGoldMeters = 55.0;
 
    // Close gold.
    int closeGoldID = rmObjectDefCreate("close gold");
