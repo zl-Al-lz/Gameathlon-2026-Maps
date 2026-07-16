@@ -35,6 +35,41 @@ void lightingOverride()
    rmTriggerAddScriptLine("}"); 
 }
 
+void mapOverlayRule(string ruleName = cEmptyString,  int playerID = 0, string messageText = cEmptyString, string speaker = cEmptyString, 
+                    string portraitStrID = cEmptyString, string sound = cEmptyString, int nextEventID = cInvalidID, 
+                    bool ignoreOnAbort = false, int timeOutMs = 0, int secondsDelay = 0, bool overrideSoundLenght = false)
+{
+   rmTriggerAddScriptLine("rule _" + ruleName);
+   rmTriggerAddScriptLine("highFrequency");
+   rmTriggerAddScriptLine("active");
+   rmTriggerAddScriptLine("runImmediately");
+   rmTriggerAddScriptLine("{");
+   rmTriggerAddScriptLine("   if (((xsGetTime() - (cActivationTime / 1000)) >= " + secondsDelay + "))");
+   rmTriggerAddScriptLine("   {");
+   rmTriggerAddScriptLine("      trSoundPlayDialogue(" + playerID + ", \"" + messageText + "\", \"" + speaker + "\", \"" + portraitStrID + "\", \"" + sound + "\", " + nextEventID + ", " + ignoreOnAbort + ", " + timeOutMs + ", " + overrideSoundLenght + ");");
+   rmTriggerAddScriptLine("      xsDisableSelf();");
+   rmTriggerAddScriptLine("   }");
+   rmTriggerAddScriptLine("}");
+}
+
+void sanitizeString(ref string pString)
+{
+   string out = "";
+   string allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 (),.-_|/";
+
+   for(int i = 0; i < xsStringLength(pString); i++)
+   {
+      string c = xsStringCharAt(pString, i);
+
+      if(xsStringContains(allowed, c, true))
+      {
+         out += c;
+      }
+   }
+   
+   pString = out;
+}
+
 void generate()
 {
    rmSetProgress(0.0);
@@ -1109,6 +1144,77 @@ void generate()
    int birdID = rmObjectDefCreate("bird");
    rmObjectDefAddItem(birdID, cUnitTypeHawk, 1);
    rmObjectDefPlaceAnywhere(birdID, 0, 2 * cNumberPlayers * getMapAreaSizeFactor());
+
+   // We will add a message with the player names and map seed for debugging and issue tracking.
+
+   // Define map name.
+   string MapName = "Budapest - Recalibrated";
+
+   // This array will contain, at each index, the strings to be concatenated.
+   string[] playersOverlay = new string(0, cEmptyString);
+
+   // We will begin iterating and concatenating, separating the V/s by team.
+   for(int i = 1; i <= cNumberTeams; i++)
+   {
+      // Get the team id.
+      int t = vTeamOrderPlaced[i];
+
+      // Get the number of players on the team.
+      int numPlayersInTeam = rmGetNumberPlayersOnTeam(t);
+      
+      for(int j = 0; j < numPlayersInTeam; j++)
+      {
+         // Get the player id.
+         int pID = rmGetPlayerOnTeam(t, j);
+
+         // In addition to the player's name, we will add their major god.
+         int civID = kbPlayerGetCiv(pID);
+
+         // Concatenate the player's name and their major god.
+         string playerInfo = kbPlayerGetName(pID) + " " + "(" + kbCivGetName(civID) + ")";
+
+         // If there is more than one player on the team, separate them with commas.
+         if(j > 0)
+         {
+            playersOverlay.add(", ");
+         }
+
+         // Add the player info to the concatenation array.
+         playersOverlay.add(playerInfo);
+
+      }
+      // Finally, add the V/s after finishing the iteration over the team.
+      if(i != cNumberTeams)
+      {
+         playersOverlay.add(" V/s ");
+      }
+   }
+   // Add the map name and its seed into a single string.
+   string mapInfo = MapName + " | " + "Seed: " + xsRandGetSeed();
+
+   // Just a message from me.
+   string speakerID = "~AL~";
+   string speakerIconPath = "atlantean\\static_color\\minor_gods\\oceanus_icon.png";
+   string overlaySound = cEmptyString; // "ui\game_starting1.wav";
+
+   // Get the dimension of the array.
+   int numConcatStrings = playersOverlay.size();
+      
+   // The string will be initialized with the characters at index 0, thereby avoiding an iteration.
+   string concatPlayerOverlay = playersOverlay[0];
+
+   // Now, we will concatenate them into this same string.
+   for(int i = 1; i < numConcatStrings; i++)
+   {
+      concatPlayerOverlay += playersOverlay[i];
+   }
+   // Now, we have a problem: if a player's name contains a character outside the ASCII set, the code won't compile and will break. 
+   // That is why we need to sanitize the string containing corrupt characters.
+   sanitizeString(concatPlayerOverlay);
+
+   // Once sanitized, we can call the trigger.
+   mapOverlayRule("MapOverlay", 1, concatPlayerOverlay + " | " + mapInfo, speakerID, speakerIconPath, overlaySound, -1, 
+                  false, 4000, 2, false);
 
    // Lighting Override.
    lightingOverride();
