@@ -30,7 +30,7 @@ vector modVectorLerp(vector A = cInvalidVector, vector B = cInvalidVector, float
    return A + (B - A) * t;
 }
 
-void mapOverlayRule(string ruleName = cEmptyString,  int playerID = 0, string messageText = cEmptyString, string speaker = cEmptyString, 
+void modGetMapInfo(string ruleName = cEmptyString, int playerID = 0, string messageText = cEmptyString, string speaker = cEmptyString, 
                     string portraitStrID = cEmptyString, string sound = cEmptyString, int nextEventID = cInvalidID, 
                     bool ignoreOnAbort = false, int timeOutMs = 0, int secondsDelay = 0, bool overrideSoundLenght = false)
 {
@@ -1500,7 +1500,7 @@ void generate()
    sanitizeString(concatPlayerOverlay);
 
    // Once sanitized, we can call the trigger.
-   mapOverlayRule("MapOverlay", 1, concatPlayerOverlay + " | " + mapInfo, speakerID, speakerIconPath, overlaySound, -1, 
+   modGetMapInfo("MapOverlay", 1, concatPlayerOverlay + " | " + mapInfo, speakerID, speakerIconPath, overlaySound, -1, 
                   false, 4000, 2, false);
 
    // Lighting Override.

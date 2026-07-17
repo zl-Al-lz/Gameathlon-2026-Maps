@@ -18,7 +18,7 @@ void lightingOverride()
    rmTriggerAddScriptLine("}"); 
 }
 
-void mapOverlayRule(string ruleName = cEmptyString,  int playerID = 0, string messageText = cEmptyString, string speaker = cEmptyString, 
+void modGetMapInfo(string ruleName = cEmptyString, int playerID = 0, string messageText = cEmptyString, string speaker = cEmptyString, 
                     string portraitStrID = cEmptyString, string sound = cEmptyString, int nextEventID = cInvalidID, 
                     bool ignoreOnAbort = false, int timeOutMs = 0, int secondsDelay = 0, bool overrideSoundLenght = false)
 {
@@ -53,165 +53,6 @@ void sanitizeString(ref string pString)
    pString = out;
 }
 
-// Too much overkill for a map, but oh well :P
-class cliffType
-{
-   // Atributes.
-
-   // Since we don't have native inheritance like C++ or Java
-   int[] areaDefIDs = default;
-
-   int[] areaConstraints = default;
-   int[] areaOriginConstraints = default;
-
-   int[] blendTypes = default;
-   int[] blendFilter = default;
-   int[] blendExpansionTiles = default;
-   int[] blendNumPasses = default;
-
-   bool[] blendIncrementalExpanse = default;
-   bool[] blendBeforePaint = default;
-
-   int[] blendExpansionConstraints = default;
-
-   int cliffTypeID = cInvalidID;
-   float cliffEmbellishmentDensity = 0.0;
-   float cliffMinSize = 0.0;
-   float cliffMaxSize = 0.0;
-   float coherence = 0.0;
-
-   int numRamps = 0; // TODO: Add num ramps candidates.
-   float rampSize = 0.0;
-   float rampVariance = 0.0;
-   float rampSpacing = 0.0;
-   float rampStepness = 0.0;
-
-   float avoidSelfDistance = 0.0;
-   float avoidSelfDistanceBuffer = 0.0;
-
-   float heightRelative = 0.0;
-   int edgeSmoothDistance = 0;
-
-   int classArea = cInvalidID;
-
-   // Setters.
-   void setCliffType(int pCliffTypeID = cInvalidID, float pEmbellishmentDensity = 0.0)
-   {
-      // Overrides.
-      cliffTypeID = pCliffTypeID;
-      cliffEmbellishmentDensity = pEmbellishmentDensity;
-
-   }
-
-   void setCliffSizeRange(float pCliffMinSize = 0.0, float pCliffMaxSize = 0.0, float pCoherence = 0.0)
-   {
-      cliffMinSize = pCliffMinSize;
-      cliffMaxSize = pCliffMaxSize;
-      coherence = pCoherence;
-   }
-
-   void setCliffRamps(int pNumRamps = 0, float pRampSize = 0.0, float pRampVariance = 0.0, float pRampSpacing = 0.0, 
-                     float pRampStepness = 0.0)
-   {
-      numRamps = pNumRamps;
-      rampSize = pRampSize;
-      rampVariance = pRampVariance;
-      rampSpacing = pRampSpacing;
-      rampStepness = pRampStepness;
-   }
-
-   void setAvoidSelfDistance(float pDistance = 0.0, float pBufferDistance = 0.0)
-   {
-      avoidSelfDistance = pDistance;
-      avoidSelfDistanceBuffer = pBufferDistance;
-   }
-
-   void setCliffHeight(float pHeight = 0.0)
-   {
-      heightRelative = pHeight;
-   }
-
-   void setEdgeSmooth(int pEdgeSmooth = 0)
-   {
-      edgeSmoothDistance = pEdgeSmooth;
-   }
-
-   void setClassAreaType(int pClassArea = cInvalidID)
-   {
-      classArea = pClassArea;
-   }
-
-   void setAreaConstraints(int constraintID = cInvalidID)
-   {
-      areaConstraints.add(constraintID);
-   }
-
-   void setAreaOriginConstraints(int constraintID = cInvalidID)
-   {
-      areaOriginConstraints.add(constraintID);
-   }
-
-   void setBlendType(int pBlendType = cBlendNone, int pBlendFilter = cFilterNone, int pBlendExpansionTiles = 0, 
-                     int pBlendNumPasses = 0, bool pBlendIncrementalExpanse = false, bool pBlendBeforePaint = false, 
-                     int pBlendExpansionConstraint = cInvalidID)
-   {
-      blendTypes.add(pBlendType);
-      blendFilter.add(pBlendFilter);
-      blendExpansionTiles.add(pBlendExpansionTiles);
-      blendNumPasses.add(pBlendNumPasses);
-      blendIncrementalExpanse.add(pBlendIncrementalExpanse);
-      blendBeforePaint.add(pBlendBeforePaint);
-      blendExpansionConstraints.add(pBlendExpansionConstraint);
-   }
-
-   // Methods.
-   
-   // That the object's area definitions inherit all the attributes established above, thus avoiding the instantiation of a 
-   // separate object for each defined area.
-   int generateAreaDef(string name = cEmptyString)
-   {
-      int numAreaConstraints = areaConstraints.size();
-      int numAreaOriginConstraints = areaOriginConstraints.size();
-      int numBlends = blendTypes.size();
-
-      int cliffID = rmAreaDefCreate(name);
-      rmAreaDefSetCliffType(cliffID, cliffTypeID);
-      rmAreaDefSetCliffRamps(cliffID, numRamps, rampSize, rampVariance, rampSpacing);
-      rmAreaDefSetCliffRampSteepness(cliffID, rampStepness);
-      rmAreaDefSetCliffEmbellishmentDensity(cliffID, cliffEmbellishmentDensity);
-      rmAreaDefSetSizeRange(cliffID, cliffMinSize, cliffMaxSize);
-      rmAreaDefSetAvoidSelfDistance(cliffID, avoidSelfDistance, avoidSelfDistanceBuffer);
-      rmAreaDefSetCoherence(cliffID, coherence);
-      rmAreaDefSetEdgeSmoothDistance(cliffID, edgeSmoothDistance);
-      rmAreaDefSetHeightRelative(cliffID, heightRelative);
-      for(int i = 0; i < numBlends; i++)
-      {
-         int blendIdx = rmAreaDefAddHeightBlend(cliffID, blendTypes[i], blendFilter[i], blendExpansionTiles[i],
-                                                blendNumPasses[i], blendIncrementalExpanse[i], blendBeforePaint[i]);
-
-         if(blendExpansionConstraints[i] != cInvalidID)
-         {  // TODO: MULTI CONSTRAINTS AND BLEND CONSTRAINTS.
-            rmAreaDefAddHeightBlendExpansionConstraint(cliffID, blendIdx, blendExpansionConstraints[i]);
-         }
-      }
-
-      for(int i = 0; i < numAreaConstraints; i++)
-      {
-         rmAreaDefAddConstraint(cliffID, areaConstraints[i]);
-      }
-      for(int i = 0; i < numAreaOriginConstraints; i++)
-      {
-         rmAreaDefAddOriginConstraint(cliffID, areaOriginConstraints[i]);
-      }
-      rmAreaDefAddToClass(cliffID, classArea);
-
-      areaDefIDs.add(cliffID);
-
-      return cliffID;
-   }
-
-};
-
 void generate()
 {
    rmSetProgress(0.0);
@@ -227,7 +68,7 @@ void generate()
    rmWaterTypeAddBeachLayer(cWaterEgyptWateringHole, cTerrainEgyptGrassRocks1, 4.0, 2.0);
 
    // Map size and terrain init.
-   int axisTiles = getScaledAxisTiles(134);
+   int axisTiles = getScaledAxisTiles(128);
    rmSetMapSize(axisTiles);
    rmInitializeMix(baseMixID);
 
@@ -318,7 +159,7 @@ void generate()
    generateLocs("starting tower locs");
 
    // Pond stuff.
-   int pondClassID = rmClassCreate("pond class");
+   int pondClassID = rmClassCreate();
 
    int forceInsidePondEdges = rmCreateClassMaxDistanceConstraint(pondClassID, 0.0, cClassAreaEdgeDistance);
 
@@ -424,8 +265,8 @@ void generate()
    if(gameIs1v1())
    {
       // Ponds will use a smaller radial and angular variation than the global one
-      float simLocPondsRadiusVar = cSimLocDefaultRadiusVar * 1.15;
-      float simLocPondsAngleVar = cSimLocDefaultAngleVar * 1.15;
+      float simLocPondsRadiusVar = cSimLocDefaultRadiusVar * 1.25;
+      float simLocPondsAngleVar = cSimLocDefaultAngleVar * 1.25;
 
       // Generate the mirrored locations first.
       int[] pondLocIDs = addSimLocsPerPlayerPair(numPondsPerPlayer * getMapAreaSizeFactor(), 60.0, -1.0, avoidPondMeters * 1.4, 
@@ -470,79 +311,6 @@ void generate()
 
    // Paint all the ponds.
    rmAreaPaintAll();
-
-   // Disable TOB conversion or they might be floating in the air due to blending after painting.
-   rmSetTOBConversion(false);
-
-   // Cliffs.
-   float avoidCliffMeters = 50.0;
-
-   // To increase pair variety, create multiple area definitions across iterations and place them in pairs.
-   // Since each iteration uses a different area definition, avoidSelfDistance becomes ineffective, as it only
-   // applies to its own paired definition. To enforce spacing across all iterations, use a shared class instead.
-   int cliffClassID = rmClassCreate("cliff class");
-   int cliffAvoidance = rmCreateClassDistanceConstraint(cliffClassID, avoidCliffMeters);
-
-   // Cliff constraints.
-   int cliffAvoidEdge = createSymmetricBoxConstraint(rmXMetersToFraction(16.0), rmZMetersToFraction(16.0));
-   int cliffAvoidBuildings = rmCreateTypeDistanceConstraint(cUnitTypeBuilding, 20.0);
-   int cliffOriginAvoidBuildings = rmCreateTypeDistanceConstraint(cUnitTypeBuilding, 25.0);
-   int cliffOriginAvoidance = rmCreateClassDistanceConstraint(cliffClassID, avoidCliffMeters * 1.4);
-   int cliffAvoidPlayerLoc = createPlayerLocDistanceConstraint(55.0);
-
-   // Cliff placement.
-   int numCliffsPerPlayer = gameIs1v1() ? 4 : 4 * getMapAreaSizeFactor();
-
-   // Object instance.
-   cliffType blueLagoonCliff;
-
-   blueLagoonCliff.setCliffType(cCliffEgyptSand, 0.25);
-   blueLagoonCliff.setCliffSizeRange(rmTilesToAreaFraction(200), rmTilesToAreaFraction(250), 0.5);
-   blueLagoonCliff.setCliffRamps(2, 0.25, 0.0, 1.0, 2.25);
-   blueLagoonCliff.setAvoidSelfDistance(avoidCliffMeters, 5.0);
-   blueLagoonCliff.setCliffHeight(6.0);
-   blueLagoonCliff.setEdgeSmooth(2);
-   blueLagoonCliff.setClassAreaType(cliffClassID);
-
-   blueLagoonCliff.setBlendType(cBlendCliffSide, cFilter3x3Gaussian, 1, 1, false, false);
-   blueLagoonCliff.setBlendType(cBlendCliffRamp, cFilter5x5Gaussian, 8, 8, true, true, vDefaultAvoidImpassableLand2);
-
-   blueLagoonCliff.setAreaConstraints(cliffAvoidBuildings);
-   blueLagoonCliff.setAreaConstraints(vDefaultAvoidWater6);
-   blueLagoonCliff.setAreaConstraints(cliffAvoidance);
-   blueLagoonCliff.setAreaConstraints(cliffAvoidPlayerLoc);
-
-   blueLagoonCliff.setAreaOriginConstraints(cliffAvoidEdge);
-   blueLagoonCliff.setAreaOriginConstraints(cliffOriginAvoidBuildings);
-   blueLagoonCliff.setAreaOriginConstraints(vDefaultAvoidWater22);
-   blueLagoonCliff.setAreaOriginConstraints(cliffOriginAvoidance);
-
-   int[] cliffBiasCandidates = new int(1, cBiasBackward);
-   cliffBiasCandidates.add(cBiasAggressive);
-   cliffBiasCandidates.add(cBiasDeadAhead);
-   cliffBiasCandidates.add(cBiasDefensive);
-
-   // Cliff placement.
-   if(gameIs1v1())
-   {
-      for(int i = 0; i < numCliffsPerPlayer; i++)
-      {
-         // This saves us from having to do setCliffType, setRamp, setSizeRange, etc. again in the loop.
-         int cliffDefID = blueLagoonCliff.generateAreaDef("cliff " + i);
-         addSimAreaLocsPerPlayerPair(cliffDefID, 1 * getMapAreaSizeFactor(), 65.0, -1.0, avoidCliffMeters * 1.5, cliffBiasCandidates[i], 
-                                       cInAreaDefault, isTournamentSeason ? sharedSide : cLocSideRandom);
-      }
-   }
-   else
-   {
-      int cliffDefID = blueLagoonCliff.generateAreaDef("global cliff ");
-      addAreaLocsPerPlayer(cliffDefID, numCliffsPerPlayer, 55.0, -1.0, avoidCliffMeters * 1.45);
-   }
-
-   generateLocs("cliff locs");
-
-   // Enable TOB conversion.
-   rmSetTOBConversion(true);
 
    rmSetProgress(0.4);
 
@@ -596,6 +364,8 @@ void generate()
    generateLocs("starting food locs");
 
    // Starting forests.
+   int forestClassID = rmClassCreate();
+
    float avoidForestMeters = 28.0;
 
    int forestDefID = rmAreaDefCreate("forest");
@@ -611,11 +381,70 @@ void generate()
    rmAreaDefAddConstraint(forestDefID, vDefaultForestAvoidTownCenter);
    rmAreaDefAddOriginConstraint(forestDefID, vDefaultAvoidWater12);
    rmAreaDefAddOriginConstraint(forestDefID, vDefaultAvoidImpassableLand14);
+   rmAreaDefAddToClass(forestDefID, forestClassID);
 
    // No simlocs here in 1v1.
    addAreaLocsPerPlayer(forestDefID, 4, cStartingForestMinDist - 2.0, cStartingForestMaxDist - 2.0, avoidForestMeters * 1.3);
 
+   // Prioritize the starting forests over the cliffs.
    generateLocs("starting forest locs");
+
+   // Disable TOB conversion or they might be floating in the air due to blending after painting.
+   rmSetTOBConversion(false);
+
+   // Cliffs.
+   float avoidCliffMeters = 25.0;
+
+   int cliffClassID = rmClassCreate();
+   int cliffAvoidance = rmCreateClassDistanceConstraint(cliffClassID, avoidCliffMeters);
+
+   float cliffMinSize = rmTilesToAreaFraction(200);
+   float cliffMaxSize = rmTilesToAreaFraction(250);
+
+   int cliffAvoidBuildings = rmCreateTypeDistanceConstraint(cUnitTypeBuilding, 20.0);
+   int cliffAvoidEdge = createSymmetricBoxConstraint(rmXMetersToFraction(16.0), rmZMetersToFraction(16.0));
+   int cliffAvoidPlayerLoc = createPlayerLocDistanceConstraint(50.0);
+   int cliffAvoidStartingForest = rmCreateClassDistanceConstraint(forestClassID, 10.0);
+   
+   int numCliffsPerPlayer = 5 * cNumberPlayers * getMapAreaSizeFactor();
+
+   for(int i = 0; i < numCliffsPerPlayer; i++)
+   {
+      int cliffID = rmAreaCreate("cliff " + i);
+      rmAreaSetCliffType(cliffID, cCliffEgyptSand);
+      rmAreaSetCliffEmbellishmentDensity(cliffID, 0.2);
+      rmAreaSetCliffSideRadius(cliffID, 0, 1);
+      rmAreaSetCliffSideSheernessThreshold(cliffID, degToRad(45.0));
+      rmAreaSetCliffRamps(cliffID, 2, 0.25, 0.0, 1.0);
+      rmAreaSetCliffRampSteepness(cliffID, 2.25);
+      rmAreaSetSizeRange(cliffID, cliffMinSize, cliffMaxSize);
+      rmAreaSetCoherence(cliffID, 0.5);
+      rmAreaSetHeightRelative(cliffID, 6.0);
+      int cliffSideBlendIDx = rmAreaAddHeightBlend(cliffID, cBlendCliffSide, cFilter3x3Gaussian, 1);
+      int cliffRampBlendIDx = rmAreaAddHeightBlend(cliffID, cBlendCliffRamp, cFilter5x5Gaussian, 8, 8, true, true);
+      rmAreaAddHeightBlendExpansionConstraint(cliffID, cliffRampBlendIDx, vDefaultAvoidImpassableLand2);
+      rmAreaAddConstraint(cliffID, cliffAvoidBuildings);
+      rmAreaAddConstraint(cliffID, vDefaultAvoidWater6);
+      rmAreaAddConstraint(cliffID, cliffAvoidPlayerLoc);
+      rmAreaAddConstraint(cliffID, cliffAvoidance);
+      rmAreaAddConstraint(cliffID, cliffAvoidStartingForest);
+      rmAreaAddOriginConstraint(cliffID, cliffAvoidance, 10.0);
+      rmAreaAddOriginConstraint(cliffID, cliffAvoidEdge);
+      rmAreaAddOriginConstraint(cliffID, vDefaultAvoidWater20);
+      rmAreaSetOriginConstraintBuffer(cliffID, xsRandFloat(5.0, 8.0));
+      rmAreaAddToClass(cliffID, cliffClassID);
+
+      if(!rmAreaFindOriginLoc(cliffID))
+      {  // Cut to avoid further unnecessary iterations.
+         rmAreaSetFailed(cliffID);
+         break;
+      }
+
+      rmAreaBuild(cliffID);
+   }
+
+   // Enable TOB conversion.
+   rmSetTOBConversion(true);
 
    rmSetProgress(0.5);
 
@@ -1408,7 +1237,7 @@ void generate()
    sanitizeString(concatPlayerOverlay);
 
    // Once sanitized, we can call the trigger.
-   mapOverlayRule("MapOverlay", 1, concatPlayerOverlay + " | " + mapInfo, speakerID, speakerIconPath, overlaySound, -1, 
+   modGetMapInfo("MapOverlay", 1, concatPlayerOverlay + " | " + mapInfo, speakerID, speakerIconPath, overlaySound, -1, 
                   false, 4000, 2, false);
 
    // Lighting override.
